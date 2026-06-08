@@ -1,0 +1,865 @@
+openapi: 3.1.0
+info:
+  title: Mello Public API
+  version: 1.0.0
+  summary: Public REST API for Mello integrations.
+  description: >
+    The Mello public API is authenticated with personal API tokens and limited to
+    the workspaces attached to the token.
+servers:
+  - url: https://mello.mezon.vn/api/v1
+    description: Production through Nginx
+security:
+  - bearerAuth: []
+tags:
+  - name: Me
+  - name: Workspaces
+  - name: Boards
+  - name: Columns
+  - name: Tickets
+  - name: Comments
+  - name: History
+  - name: Search
+paths:
+  /me:
+    get:
+      tags: [Me]
+      summary: Get the API token owner.
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /workspaces:
+    get:
+      tags: [Workspaces]
+      summary: List token-accessible workspaces.
+      operationId: listWorkspaces
+      responses:
+        '200':
+          description: Workspaces.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workspace'
+  /workspaces/{workspaceID}/members:
+    get:
+      tags: [Workspaces]
+      summary: List workspace members.
+      operationId: listWorkspaceMembers
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      responses:
+        '200':
+          description: Members.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkspaceMember'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspaceID}/boards:
+    get:
+      tags: [Boards]
+      summary: List boards in a workspace.
+      operationId: listWorkspaceBoards
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      responses:
+        '200':
+          description: Boards.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Board'
+    post:
+      tags: [Boards]
+      summary: Create a board.
+      operationId: createBoard
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBoardRequest'
+      responses:
+        '201':
+          description: Created board.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /boards/{boardID}:
+    get:
+      tags: [Boards]
+      summary: Get a board with columns and tickets.
+      operationId: getBoard
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '200':
+          description: Board.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+    patch:
+      tags: [Boards]
+      summary: Update board metadata.
+      operationId: updateBoard
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBoardRequest'
+      responses:
+        '200':
+          description: Updated board.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Board'
+    delete:
+      tags: [Boards]
+      summary: Delete a board.
+      operationId: deleteBoard
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '204':
+          description: Deleted.
+  /boards/{boardID}/columns:
+    get:
+      tags: [Columns]
+      summary: List board columns.
+      operationId: listColumns
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '200':
+          description: Columns.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Column'
+    post:
+      tags: [Columns]
+      summary: Create a column.
+      operationId: createColumn
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateColumnRequest'
+      responses:
+        '201':
+          description: Created column.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Column'
+  /boards/{boardID}/columns/reorder:
+    patch:
+      tags: [Columns]
+      summary: Reorder board columns.
+      operationId: reorderColumns
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [column_ids]
+              properties:
+                column_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '204':
+          description: Reordered.
+  /boards/{boardID}/tickets:
+    get:
+      tags: [Tickets]
+      summary: List tickets on a board.
+      operationId: listBoardTickets
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '200':
+          description: Tickets.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ticket'
+  /columns/{columnID}:
+    patch:
+      tags: [Columns]
+      summary: Update a column.
+      operationId: updateColumn
+      parameters:
+        - $ref: '#/components/parameters/ColumnID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateColumnRequest'
+      responses:
+        '200':
+          description: Updated column.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Column'
+  /columns/{columnID}/tickets:
+    post:
+      tags: [Tickets]
+      summary: Create a ticket in a column.
+      operationId: createTicket
+      parameters:
+        - $ref: '#/components/parameters/ColumnID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTicketRequest'
+      responses:
+        '201':
+          description: Created ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+  /tickets/{ticketID}:
+    get:
+      tags: [Tickets]
+      summary: Get a ticket.
+      operationId: getTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      responses:
+        '200':
+          description: Ticket detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetail'
+    patch:
+      tags: [Tickets]
+      summary: Update a ticket.
+      operationId: updateTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTicketRequest'
+      responses:
+        '200':
+          description: Updated ticket.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+  /tickets/{ticketID}/move:
+    patch:
+      tags: [Tickets]
+      summary: Move a ticket atomically.
+      operationId: moveTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveTicketRequest'
+      responses:
+        '200':
+          description: Move result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveTicketResult'
+  /tickets/{ticketID}/comments:
+    get:
+      tags: [Comments]
+      summary: List ticket comments.
+      operationId: listComments
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      responses:
+        '200':
+          description: Comments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+    post:
+      tags: [Comments]
+      summary: Add a ticket comment.
+      operationId: createComment
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+      responses:
+        '201':
+          description: Created comment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+  /tickets/{ticketID}/history:
+    get:
+      tags: [History]
+      summary: List ticket history.
+      operationId: listHistory
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      responses:
+        '200':
+          description: History entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HistoryEntry'
+  /search:
+    get:
+      tags: [Search]
+      summary: Search tickets in a workspace.
+      operationId: searchTickets
+      parameters:
+        - name: workspace_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Mello API token
+  parameters:
+    WorkspaceID:
+      name: workspaceID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    BoardID:
+      name: boardID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ColumnID:
+      name: columnID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    TicketID:
+      name: ticketID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Unauthorized:
+      description: Missing or invalid token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Token cannot access the resource or lacks scope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          examples: [validation_error, unauthorized, forbidden, not_found, internal_error, rate_limited]
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+    User:
+      type: object
+      required: [id, email, name, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    Workspace:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        owner_id:
+          type: string
+          format: uuid
+        image_url:
+          type: string
+          nullable: true
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    WorkspaceMember:
+      type: object
+      properties:
+        workspace_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    Board:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+        background_color:
+          type: string
+          nullable: true
+        cover_image_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/Column'
+    Column:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        board_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+        color:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        archived_at:
+          type: string
+          format: date-time
+          nullable: true
+        ticket_count:
+          type: integer
+        tickets:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ticket'
+    Ticket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: integer
+        ticket_code:
+          type: string
+        column_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        description_html:
+          type: string
+        position:
+          type: integer
+        assignee_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketMember'
+        comment_count:
+          type: integer
+        attachment_count:
+          type: integer
+        checklist_item_count:
+          type: integer
+        checklist_checked_count:
+          type: integer
+    TicketDetail:
+      allOf:
+        - $ref: '#/components/schemas/Ticket'
+        - type: object
+          properties:
+            board_id:
+              type: string
+              format: uuid
+            workspace_id:
+              type: string
+              format: uuid
+            column_name:
+              type: string
+            comments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Comment'
+            activities:
+              type: array
+              items:
+                $ref: '#/components/schemas/HistoryEntry'
+    Label:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        board_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        color:
+          type: string
+    TicketMember:
+      type: object
+      properties:
+        ticket_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatar_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        body_html:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        author:
+          $ref: '#/components/schemas/User'
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        action:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+        author:
+          $ref: '#/components/schemas/User'
+          nullable: true
+    SearchResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_number:
+          type: integer
+        ticket_code:
+          type: string
+        board_code:
+          type: string
+        column_id:
+          type: string
+          format: uuid
+        board_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        board_name:
+          type: string
+        column_name:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        assignee_id:
+          type: string
+          format: uuid
+          nullable: true
+        rank:
+          type: number
+        updated_at:
+          type: string
+          format: date-time
+    CreateBoardRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        code:
+          type: string
+          description: Optional board code. Generated from name when omitted.
+    UpdateBoardRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        background_color:
+          type: string
+        cover_image_url:
+          type: string
+    CreateColumnRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        position:
+          type: integer
+    UpdateColumnRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        position:
+          type: integer
+        color:
+          type: string
+    CreateTicketRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        position:
+          type: integer
+    UpdateTicketRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        description_html:
+          type: string
+        assignee_id:
+          type: string
+          format: uuid
+          nullable: true
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+    MoveTicketRequest:
+      type: object
+      required: [column_id, position]
+      properties:
+        column_id:
+          type: string
+          format: uuid
+        position:
+          type: integer
+    MoveTicketResult:
+      type: object
+      properties:
+        ticket:
+          $ref: '#/components/schemas/Ticket'
+        workspace_id:
+          type: string
+          format: uuid
+        from_column:
+          type: string
+          format: uuid
+        to_column:
+          type: string
+          format: uuid
+    CreateCommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+        body_html:
+          type: string
