@@ -1,0 +1,14 @@
+.venv/
+.env
+.env.*
+.mypy_cache/
+.pytest_cache/
+mello_sdk.egg-info/
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
+.pypirc
