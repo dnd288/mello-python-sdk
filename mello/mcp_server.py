@@ -234,6 +234,44 @@ def create_mcp_server(
         """Search tickets in a Mello workspace."""
         return _serialize(client().search_tickets(workspace_id, q))
 
+    @server.tool()
+    def create_checklist(ticket_id: str, title: str) -> Any:
+        """Create a checklist for a ticket."""
+        return _serialize(client().create_checklist(ticket_id, title))
+
+    @server.tool()
+    def create_checklist_item(checklist_id: str, title: str) -> Any:
+        """Create an item inside a checklist."""
+        return _serialize(client().create_checklist_item(checklist_id, title))
+
+    @server.tool()
+    def update_checklist_item(checklist_item_id: str, is_checked: bool) -> Any:
+        """Update a checklist item's state (checked/unchecked)."""
+        return _serialize(client().update_checklist_item(checklist_item_id, is_checked))
+
+    @server.tool()
+    def create_attachment(
+        ticket_id: str,
+        filename: str,
+        file_content_base64: str,
+        content_type: Optional[str] = None,
+    ) -> Any:
+        """Upload an attachment to a ticket (requires Base64 encoded file content)."""
+        import base64
+
+        file_content = base64.b64decode(file_content_base64)
+        return _serialize(
+            client().create_attachment(ticket_id, filename, file_content, content_type)
+        )
+
+    @server.tool()
+    def download_attachment(attachment_id: str) -> str:
+        """Download attachment content as a Base64 encoded string."""
+        import base64
+
+        content = client().download_attachment(attachment_id)
+        return base64.b64encode(content).decode("utf-8")
+
     return server
 
 

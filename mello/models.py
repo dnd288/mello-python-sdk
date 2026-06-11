@@ -144,6 +144,38 @@ class Checklist:
 
 
 @dataclass
+class Attachment:
+    id: str
+    ticket_id: str
+    user_id: str
+    bucket: str
+    object_key: str
+    filename: str
+    content_type: str
+    byte_size: int
+    etag: str
+    created_at: Optional[datetime] = None
+    author: Optional[User] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Attachment":
+        author_data = data.get("author")
+        return cls(
+            id=data.get("id", ""),
+            ticket_id=data.get("ticket_id", ""),
+            user_id=data.get("user_id", ""),
+            bucket=data.get("bucket", ""),
+            object_key=data.get("object_key", ""),
+            filename=data.get("filename", ""),
+            content_type=data.get("content_type", ""),
+            byte_size=data.get("byte_size", 0),
+            etag=data.get("etag", ""),
+            created_at=parse_datetime(data.get("created_at")),
+            author=User.from_dict(author_data) if author_data else None,
+        )
+
+
+@dataclass
 class TicketMember:
     ticket_id: str
     user_id: str
@@ -331,7 +363,7 @@ class TicketDetail(Ticket):
     comments: List[Comment] = field(default_factory=list)
     activities: List[HistoryEntry] = field(default_factory=list)
     checklists: List[Checklist] = field(default_factory=list)
-    attachments: List[Dict[str, Any]] = field(default_factory=list)
+    attachments: List[Attachment] = field(default_factory=list)
     custom_fields: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
@@ -371,7 +403,7 @@ class TicketDetail(Ticket):
             comments=[Comment.from_dict(c) for c in comments_data],
             activities=[HistoryEntry.from_dict(h) for h in activities_data],
             checklists=[Checklist.from_dict(c) for c in checklists_data],
-            attachments=attachments_data,
+            attachments=[Attachment.from_dict(a) for a in attachments_data],
             custom_fields=custom_fields_data,
         )
 

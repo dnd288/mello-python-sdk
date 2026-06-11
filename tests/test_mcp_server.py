@@ -187,6 +187,36 @@ class FakeClient:
         self.calls.append(("search_tickets", workspace_id, q))
         return [{"workspace_id": workspace_id, "q": q}]
 
+    def create_checklist(self, ticket_id: str, title: str) -> Dict[str, Any]:
+        self.calls.append(("create_checklist", ticket_id, title))
+        return {"ticket_id": ticket_id, "title": title, "id": "chk-1"}
+
+    def create_checklist_item(self, checklist_id: str, title: str) -> Dict[str, Any]:
+        self.calls.append(("create_checklist_item", checklist_id, title))
+        return {"checklist_id": checklist_id, "title": title, "id": "chki-1"}
+
+    def update_checklist_item(
+        self, checklist_item_id: str, is_checked: bool
+    ) -> Dict[str, Any]:
+        self.calls.append(("update_checklist_item", checklist_item_id, is_checked))
+        return {"id": checklist_item_id, "is_checked": is_checked}
+
+    def create_attachment(
+        self,
+        ticket_id: str,
+        filename: str,
+        file_content: bytes,
+        content_type: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        self.calls.append(
+            ("create_attachment", ticket_id, filename, file_content, content_type)
+        )
+        return {"ticket_id": ticket_id, "filename": filename, "id": "att-1"}
+
+    def download_attachment(self, attachment_id: str) -> bytes:
+        self.calls.append(("download_attachment", attachment_id))
+        return b"fakebytescontent"
+
 
 def build_fake_server() -> Any:
     from mello.mcp_server import create_mcp_server
@@ -200,11 +230,15 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
     server, _client = build_fake_server()
 
     assert sorted(server.tools) == [
+        "create_attachment",
         "create_board",
+        "create_checklist",
+        "create_checklist_item",
         "create_column",
         "create_comment",
         "create_ticket",
         "delete_board",
+        "download_attachment",
         "get_board",
         "get_current_user",
         "get_ticket",
@@ -219,6 +253,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "reorder_columns",
         "search_tickets",
         "update_board",
+        "update_checklist_item",
         "update_column",
         "update_ticket",
     ]
@@ -236,6 +271,47 @@ def test_registered_tools_delegate_to_client_and_serialize_results() -> None:
     ) == {"column_id": "column-1", "title": "Ship MCP"}
     assert server.tools["delete_board"](board_id="board-1") is None
     assert client.calls[-1] == ("delete_board", "board-1")
+
+    # Checklist tests
+    assert server.tools["create_checklist"](ticket_id="ticket-1", title="Setup") == {
+        "ticket_id": "ticket-1",
+        "title": "Setup",
+        "id": "chk-1",
+    }
+    assert client.calls[-1] == ("create_checklist", "ticket-1", "Setup")
+
+    assert server.tools["create_checklist_item"](
+        checklist_id="chk-1", title="Task 1"
+    ) == {"checklist_id": "chk-1", "title": "Task 1", "id": "chki-1"}
+    assert client.calls[-1] == ("create_checklist_item", "chk-1", "Task 1")
+
+    assert server.tools["update_checklist_item"](
+        checklist_item_id="chki-1", is_checked=True
+    ) == {"id": "chki-1", "is_checked": True}
+    assert client.calls[-1] == ("update_checklist_item", "chki-1", True)
+
+    # Attachment tests
+    import base64
+
+    content_b64 = base64.b64encode(b"hello world").decode("utf-8")
+    assert server.tools["create_attachment"](
+        ticket_id="ticket-1",
+        filename="test.txt",
+        file_content_base64=content_b64,
+        content_type="text/plain",
+    ) == {"ticket_id": "ticket-1", "filename": "test.txt", "id": "att-1"}
+    assert client.calls[-1] == (
+        "create_attachment",
+        "ticket-1",
+        "test.txt",
+        b"hello world",
+        "text/plain",
+    )
+
+    assert server.tools["download_attachment"](
+        attachment_id="att-1"
+    ) == base64.b64encode(b"fakebytescontent").decode("utf-8")
+    assert client.calls[-1] == ("download_attachment", "att-1")
 
 
 def test_update_tools_preserve_omitted_and_explicit_null_values() -> None:

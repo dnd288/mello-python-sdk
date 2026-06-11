@@ -15,6 +15,9 @@ from mello.models import (
     HistoryEntry,
     SearchResult,
     MoveTicketResult,
+    Checklist,
+    ChecklistItem,
+    Attachment,
 )
 
 
@@ -62,15 +65,38 @@ class MelloClient:
         path: str,
         params: Optional[Dict[str, Any]] = None,
         json_data: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+        use_v1: bool = True,
+        stream: bool = False,
     ) -> Any:
-        url = f"{self.base_url}{path}"
+        base = self.base_url
+        if not use_v1 and base.endswith("/v1"):
+            base = base[:-3]
+        url = f"{base}{path}"
+
+        headers = {}
+        if files:
+            headers = {"Content-Type": None}
+
         response = self.session.request(
             method=method,
             url=url,
             params=params,
             json=json_data,
+            files=files,
+            headers=headers if files else None,
             timeout=self.timeout,
+            stream=stream,
         )
+
+        if stream:
+            if response.status_code >= 400:
+                try:
+                    response_json = response.json() if response.text else None
+                except ValueError:
+                    response_json = None
+                raise_for_status(response.status_code, response_json)
+            return response.content
 
         try:
             response_json = response.json() if response.text else None
@@ -494,3 +520,66 @@ class MelloClient:
         }
         data = self._request("GET", "/search", params=params)
         return [SearchResult.from_dict(s) for s in (data or [])]
+
+    # --- Checklists Tag ---
+
+    def create_checklist(self, ticket_id: str, title: str) -> Checklist:
+        """
+        Create a checklist for a ticket.
+        """
+        payload = {"title": title}
+        data = self._request(
+            "POST", f"/tickets/{ticket_id}/checklists", json_data=payload, use_v1=False
+        )
+        return Checklist.from_dict(data)
+
+    def create_checklist_item(self, checklist_id: str, title: str) -> ChecklistItem:
+        """
+        Create an item inside a checklist.
+        """
+        payload = {"title": title}
+        data = self._request(
+            "POST", f"/checklists/{checklist_id}/items", json_data=payload, use_v1=False
+        )
+        return ChecklistItem.from_dict(data)
+
+    def update_checklist_item(
+        self, checklist_item_id: str, is_checked: bool
+    ) -> ChecklistItem:
+        """
+        Update a checklist item's state (checked/unchecked).
+        """
+        payload = {"is_checked": is_checked}
+        data = self._request(
+            "PATCH",
+            f"/checklist-items/{checklist_item_id}",
+            json_data=payload,
+            use_v1=False,
+        )
+        return ChecklistItem.from_dict(data)
+
+    # --- Attachments Tag ---
+
+    def create_attachment(
+        self,
+        ticket_id: str,
+        filename: str,
+        file_content: bytes,
+        content_type: Optional[str] = None,
+    ) -> Attachment:
+        """
+        Upload an attachment to a ticket.
+        """
+        files = {"file": (filename, file_content, content_type)}
+        data = self._request(
+            "POST", f"/tickets/{ticket_id}/attachments", files=files, use_v1=False
+        )
+        return Attachment.from_dict(data)
+
+    def download_attachment(self, attachment_id: str) -> bytes:
+        """
+        Download attachment raw content bytes.
+        """
+        return self._request(
+            "GET", f"/attachments/{attachment_id}/download", use_v1=False, stream=True
+        )

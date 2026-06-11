@@ -24,6 +24,7 @@ from mello.models import (
     TicketMember,
     Checklist,
     ChecklistItem,
+    Attachment,
 )
 
 __all__ = [
@@ -52,4 +53,5 @@ __all__ = [
     "TicketMember",
     "Checklist",
     "ChecklistItem",
+    "Attachment",
 ]

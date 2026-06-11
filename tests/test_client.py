@@ -766,3 +766,107 @@ def test_list_board_tickets_null_response(client: MelloClient) -> None:
 
     tickets = client.list_board_tickets(board_id)
     assert tickets == []
+
+
+@responses.activate
+def test_create_checklist(client: MelloClient) -> None:
+    ticket_id = "ticket-123"
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/tickets/{ticket_id}/checklists",
+        match=[responses.matchers.json_params_matcher({"title": "Setup"})],
+        json={
+            "id": "chk-1",
+            "ticket_id": ticket_id,
+            "title": "Setup",
+            "position": 0,
+        },
+        status=201,
+    )
+
+    checklist = client.create_checklist(ticket_id, "Setup")
+    assert checklist.id == "chk-1"
+    assert checklist.title == "Setup"
+
+
+@responses.activate
+def test_create_checklist_item(client: MelloClient) -> None:
+    checklist_id = "chk-1"
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/checklists/{checklist_id}/items",
+        match=[responses.matchers.json_params_matcher({"title": "Write tests"})],
+        json={
+            "id": "chki-1",
+            "checklist_id": checklist_id,
+            "title": "Write tests",
+            "is_checked": False,
+            "position": 0,
+        },
+        status=201,
+    )
+
+    item = client.create_checklist_item(checklist_id, "Write tests")
+    assert item.id == "chki-1"
+    assert item.title == "Write tests"
+    assert item.is_checked is False
+
+
+@responses.activate
+def test_update_checklist_item(client: MelloClient) -> None:
+    item_id = "chki-1"
+    responses.add(
+        responses.PATCH,
+        f"https://mello.mezon.vn/api/checklist-items/{item_id}",
+        match=[responses.matchers.json_params_matcher({"is_checked": True})],
+        json={
+            "id": item_id,
+            "checklist_id": "chk-1",
+            "title": "Write tests",
+            "is_checked": True,
+            "position": 0,
+        },
+        status=200,
+    )
+
+    item = client.update_checklist_item(item_id, is_checked=True)
+    assert item.is_checked is True
+
+
+@responses.activate
+def test_create_attachment(client: MelloClient) -> None:
+    ticket_id = "ticket-123"
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/tickets/{ticket_id}/attachments",
+        json={
+            "id": "att-1",
+            "ticket_id": ticket_id,
+            "user_id": "user-1",
+            "bucket": "ecosystems",
+            "object_key": "some/path/test.png",
+            "filename": "test.png",
+            "content_type": "image/png",
+            "byte_size": 12,
+            "etag": "abc",
+        },
+        status=201,
+    )
+
+    att = client.create_attachment(ticket_id, "test.png", b"fakecontent", "image/png")
+    assert att.id == "att-1"
+    assert att.filename == "test.png"
+
+
+@responses.activate
+def test_download_attachment(client: MelloClient) -> None:
+    attachment_id = "att-1"
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/attachments/{attachment_id}/download",
+        body=b"filebytesdata",
+        status=200,
+    )
+
+    content = client.download_attachment(attachment_id)
+    assert content == b"filebytesdata"
