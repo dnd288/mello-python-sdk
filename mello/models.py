@@ -97,6 +97,53 @@ class Label:
 
 
 @dataclass
+class ChecklistItem:
+    id: str
+    checklist_id: str
+    title: str
+    is_checked: bool
+    position: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ChecklistItem":
+        return cls(
+            id=data.get("id", ""),
+            checklist_id=data.get("checklist_id", ""),
+            title=data.get("title", ""),
+            is_checked=data.get("is_checked", False),
+            position=data.get("position", 0),
+            created_at=parse_datetime(data.get("created_at")),
+            updated_at=parse_datetime(data.get("updated_at")),
+        )
+
+
+@dataclass
+class Checklist:
+    id: str
+    ticket_id: str
+    title: str
+    position: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    items: List[ChecklistItem] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Checklist":
+        items_data = data.get("items") or []
+        return cls(
+            id=data.get("id", ""),
+            ticket_id=data.get("ticket_id", ""),
+            title=data.get("title", ""),
+            position=data.get("position", 0),
+            created_at=parse_datetime(data.get("created_at")),
+            updated_at=parse_datetime(data.get("updated_at")),
+            items=[ChecklistItem.from_dict(i) for i in items_data],
+        )
+
+
+@dataclass
 class TicketMember:
     ticket_id: str
     user_id: str
@@ -127,6 +174,7 @@ class Ticket:
     description: str
     description_html: str
     position: int
+    board_code: str = ""
     assignee_id: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
@@ -152,6 +200,7 @@ class Ticket:
             description=data.get("description", ""),
             description_html=data.get("description_html", ""),
             position=data.get("position", 0),
+            board_code=data.get("board_code", ""),
             assignee_id=data.get("assignee_id"),
             start_date=parse_datetime(data.get("start_date")),
             end_date=parse_datetime(data.get("end_date")),
@@ -281,6 +330,9 @@ class TicketDetail(Ticket):
     column_name: str = ""
     comments: List[Comment] = field(default_factory=list)
     activities: List[HistoryEntry] = field(default_factory=list)
+    checklists: List[Checklist] = field(default_factory=list)
+    attachments: List[Dict[str, Any]] = field(default_factory=list)
+    custom_fields: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TicketDetail":
@@ -288,6 +340,9 @@ class TicketDetail(Ticket):
         base_ticket = Ticket.from_dict(data)
         comments_data = data.get("comments") or []
         activities_data = data.get("activities") or []
+        checklists_data = data.get("checklists") or []
+        attachments_data = data.get("attachments") or []
+        custom_fields_data = data.get("custom_fields") or []
 
         return cls(
             id=base_ticket.id,
@@ -298,6 +353,7 @@ class TicketDetail(Ticket):
             description=base_ticket.description,
             description_html=base_ticket.description_html,
             position=base_ticket.position,
+            board_code=base_ticket.board_code or data.get("board_code", ""),
             assignee_id=base_ticket.assignee_id,
             start_date=base_ticket.start_date,
             end_date=base_ticket.end_date,
@@ -314,6 +370,9 @@ class TicketDetail(Ticket):
             column_name=data.get("column_name", ""),
             comments=[Comment.from_dict(c) for c in comments_data],
             activities=[HistoryEntry.from_dict(h) for h in activities_data],
+            checklists=[Checklist.from_dict(c) for c in checklists_data],
+            attachments=attachments_data,
+            custom_fields=custom_fields_data,
         )
 
 

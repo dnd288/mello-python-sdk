@@ -404,6 +404,7 @@ def test_get_ticket(client: MelloClient) -> None:
         "id": ticket_id,
         "ticket_number": 101,
         "ticket_code": "PROJ-101",
+        "board_code": "PROJ",
         "column_id": "c1c1c1c1-c2c2-c3c3-c4c4-c5c5c5c5c5c5",
         "title": "Task 1",
         "description": "Task description",
@@ -432,6 +433,29 @@ def test_get_ticket(client: MelloClient) -> None:
             }
         ],
         "activities": [],
+        "checklists": [
+            {
+                "id": "chk1",
+                "ticket_id": ticket_id,
+                "title": "Setup",
+                "position": 0,
+                "created_at": "2026-06-02T11:15:00Z",
+                "updated_at": "2026-06-02T11:20:00Z",
+                "items": [
+                    {
+                        "id": "chki1",
+                        "checklist_id": "chk1",
+                        "title": "Write tests",
+                        "is_checked": True,
+                        "position": 0,
+                        "created_at": "2026-06-02T11:16:00Z",
+                        "updated_at": "2026-06-02T11:18:00Z",
+                    }
+                ],
+            }
+        ],
+        "attachments": [],
+        "custom_fields": [],
     }
     responses.add(
         responses.GET,
@@ -443,10 +467,18 @@ def test_get_ticket(client: MelloClient) -> None:
     ticket = client.get_ticket(ticket_id)
     assert ticket.title == "Task 1"
     assert ticket.column_name == "To Do"
+    assert ticket.board_code == "PROJ"
     assert len(ticket.labels) == 1
     assert ticket.labels[0].name == "bug"
     assert len(ticket.comments) == 1
     assert ticket.comments[0].body == "A comment"
+    assert len(ticket.checklists) == 1
+    assert ticket.checklists[0].title == "Setup"
+    assert len(ticket.checklists[0].items) == 1
+    assert ticket.checklists[0].items[0].title == "Write tests"
+    assert ticket.checklists[0].items[0].is_checked is True
+    assert ticket.attachments == []
+    assert ticket.custom_fields == []
 
 
 @responses.activate

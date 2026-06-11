@@ -22,6 +22,8 @@ from mello.models import (
     MoveTicketResult,
     Label,
     TicketMember,
+    Checklist,
+    ChecklistItem,
 )
 
 __all__ = [
@@ -48,4 +50,6 @@ __all__ = [
     "MoveTicketResult",
     "Label",
     "TicketMember",
+    "Checklist",
+    "ChecklistItem",
 ]

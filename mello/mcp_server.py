@@ -5,7 +5,6 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Type
 
 from mello.client import MelloClient, UNSET
 
-
 ClientFactory = Callable[[], Any]
 
 

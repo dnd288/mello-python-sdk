@@ -413,6 +413,15 @@ class MelloClient:
         data = self._request("PATCH", f"/tickets/{ticket_id}/move", json_data=payload)
         return MoveTicketResult.from_dict(data)
 
+    def delete_ticket(self, ticket_id: str) -> None:
+        """
+        Delete a ticket.
+
+        Args:
+            ticket_id: The ID of the ticket.
+        """
+        self._request("DELETE", f"/tickets/{ticket_id}")
+
     # --- Comments Tag ---
 
     def list_comments(self, ticket_id: str) -> List[Comment]:
