@@ -80,6 +80,40 @@ columns, tickets, comments, history, and search. Update tools accept an
 `updates` object so omitted fields are left unchanged while explicit `null`
 values are sent to Mello for nullable fields.
 
+### Transport
+
+`main()` selects the transport from the `MCP_TRANSPORT` environment variable.
+The default is `stdio` for local assistant integrations. Set it to
+`streamable-http` (or `sse`) to expose the server over HTTP. In HTTP mode the
+bind address is controlled by `MCP_HOST` (default `0.0.0.0`) and `MCP_PORT`
+(default `8000`).
+
+```bash
+MCP_TRANSPORT=streamable-http MCP_PORT=8000 uv run mello-mcp-server
+```
+
+### Docker
+
+The repository ships a `Dockerfile` and `docker-compose.yml` that run the
+server with the `streamable-http` transport on port `8000`.
+
+Build and run with Docker:
+
+```bash
+docker build -t mello-mcp-server .
+docker run --rm -p 8000:8000 -e MELLO_API_KEY="mello_pat_..." mello-mcp-server
+```
+
+Or use Docker Compose (reads `MELLO_API_KEY` from your environment or `.env`):
+
+```bash
+export MELLO_API_KEY="mello_pat_..."
+docker compose up --build
+```
+
+The HTTP endpoint is served at `http://localhost:8000/mcp`. Point an MCP client
+that supports the streamable-http transport at that URL.
+
 ## Usage
 
 ### Boards

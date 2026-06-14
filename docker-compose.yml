@@ -1,0 +1,18 @@
+services:
+  mello-mcp-server:
+    build: .
+    image: mello-mcp-server:latest
+    container_name: mello-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Required: Mello personal access token.
+      MELLO_API_KEY: ${MELLO_API_KEY:?MELLO_API_KEY is required}
+      # Optional Mello API overrides.
+      MELLO_BASE_URL: ${MELLO_BASE_URL:-https://mello.mezon.vn/api/v1}
+      MELLO_TIMEOUT: ${MELLO_TIMEOUT:-30}
+      # MCP transport settings for the container.
+      MCP_TRANSPORT: streamable-http
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8000

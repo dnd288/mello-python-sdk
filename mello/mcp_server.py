@@ -276,7 +276,18 @@ def create_mcp_server(
 
 
 def main() -> None:
-    create_mcp_server().run()
+    transport = os.environ.get("MCP_TRANSPORT", "stdio")
+    server = create_mcp_server()
+
+    if transport in ("streamable-http", "sse"):
+        host = os.environ.get("MCP_HOST", "0.0.0.0")
+        port = int(os.environ.get("MCP_PORT", "8000"))
+        # FastMCP reads bind settings from its settings object.
+        server.settings.host = host
+        server.settings.port = port
+        server.run(transport=transport)
+    else:
+        server.run()
 
 
 if __name__ == "__main__":
