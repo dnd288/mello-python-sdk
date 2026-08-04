@@ -1,33 +1,11 @@
 import os
-from dataclasses import fields, is_dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Type
 
 from mello.client import MelloClient, UNSET
+from mello.serialize import serialize as _serialize
 
 ClientFactory = Callable[[], Any]
-
-
-def _serialize(value: Any) -> Any:
-    if isinstance(value, datetime):
-        return value.isoformat()
-
-    if is_dataclass(value) and not isinstance(value, type):
-        return {
-            field.name: _serialize(getattr(value, field.name))
-            for field in fields(value)
-        }
-
-    if isinstance(value, list):
-        return [_serialize(item) for item in value]
-
-    if isinstance(value, tuple):
-        return [_serialize(item) for item in value]
-
-    if isinstance(value, dict):
-        return {key: _serialize(item) for key, item in value.items()}
-
-    return value
 
 
 def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
@@ -261,21 +239,15 @@ def create_mcp_server(
         checklist_id: str, title: str, position: Optional[int] = None
     ) -> Any:
         """Create an item inside a checklist."""
-        return _serialize(
-            client().create_checklist_item(checklist_id, title, position)
-        )
+        return _serialize(client().create_checklist_item(checklist_id, title, position))
 
     @server.tool()
     def update_checklist_item(
         checklist_item_id: str, updates: Optional[Dict[str, Any]] = None
     ) -> Any:
         """Update checklist item fields: title, is_checked, position."""
-        kwargs = _present_update_kwargs(
-            updates, ["title", "is_checked", "position"]
-        )
-        return _serialize(
-            client().update_checklist_item(checklist_item_id, **kwargs)
-        )
+        kwargs = _present_update_kwargs(updates, ["title", "is_checked", "position"])
+        return _serialize(client().update_checklist_item(checklist_item_id, **kwargs))
 
     @server.tool()
     def delete_checklist_item(checklist_item_id: str) -> None:
@@ -378,9 +350,7 @@ def create_mcp_server(
         )
 
     @server.tool()
-    def delete_github_installation(
-        workspace_id: str, installation_id: str
-    ) -> None:
+    def delete_github_installation(workspace_id: str, installation_id: str) -> None:
         """Delete a GitHub installation from a workspace."""
         client().delete_github_installation(workspace_id, installation_id)
         return None
@@ -425,7 +395,6 @@ def create_mcp_server(
         return None
 
     @server.tool()
-
     @server.tool()
     def create_attachment(
         ticket_id: str,
