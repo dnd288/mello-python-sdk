@@ -92,14 +92,16 @@ def test_mello_client_integration() -> None:
         )
         assert updated_ticket.description == "Updated description"
 
-        # Verify we can clear assignee/dates (set to None)
+        # Verify we can clear pic_user_id/supervisor_id/dates (set to None)
         cleared_ticket = client.update_ticket(
             ticket.id,
-            assignee_id=None,
+            pic_user_id=None,
+            supervisor_id=None,
             start_date=None,
             end_date=None,
         )
-        assert cleared_ticket.assignee_id is None
+        assert cleared_ticket.pic_user_id is None
+        assert cleared_ticket.supervisor_id is None
 
         # 12. Create a comment
         comment = client.create_comment(

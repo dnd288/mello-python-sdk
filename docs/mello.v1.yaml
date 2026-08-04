@@ -10,20 +10,23 @@ servers:
   - url: https://mello.mezon.vn/api/v1
     description: Production through Nginx
 security:
-  - bearerAuth: []
+  - bearerAuth: [ ]
 tags:
   - name: Me
   - name: Workspaces
   - name: Boards
   - name: Columns
   - name: Tickets
+  - name: Checklists
   - name: Comments
   - name: History
   - name: Search
+  - name: Webhooks
+  - name: Github
 paths:
   /me:
     get:
-      tags: [Me]
+      tags: [ Me ]
       summary: Get the API token owner.
       operationId: getCurrentUser
       responses:
@@ -37,7 +40,7 @@ paths:
           $ref: '#/components/responses/Unauthorized'
   /workspaces:
     get:
-      tags: [Workspaces]
+      tags: [ Workspaces ]
       summary: List token-accessible workspaces.
       operationId: listWorkspaces
       responses:
@@ -51,7 +54,7 @@ paths:
                   $ref: '#/components/schemas/Workspace'
   /workspaces/{workspaceID}/members:
     get:
-      tags: [Workspaces]
+      tags: [ Workspaces ]
       summary: List workspace members.
       operationId: listWorkspaceMembers
       parameters:
@@ -71,7 +74,7 @@ paths:
           $ref: '#/components/responses/NotFound'
   /workspaces/{workspaceID}/boards:
     get:
-      tags: [Boards]
+      tags: [ Boards ]
       summary: List boards in a workspace.
       operationId: listWorkspaceBoards
       parameters:
@@ -86,7 +89,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Board'
     post:
-      tags: [Boards]
+      tags: [ Boards ]
       summary: Create a board.
       operationId: createBoard
       parameters:
@@ -108,7 +111,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
   /boards/{boardID}:
     get:
-      tags: [Boards]
+      tags: [ Boards ]
       summary: Get a board with columns and tickets.
       operationId: getBoard
       parameters:
@@ -121,7 +124,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Board'
     patch:
-      tags: [Boards]
+      tags: [ Boards ]
       summary: Update board metadata.
       operationId: updateBoard
       parameters:
@@ -140,7 +143,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Board'
     delete:
-      tags: [Boards]
+      tags: [ Boards ]
       summary: Delete a board.
       operationId: deleteBoard
       parameters:
@@ -150,7 +153,7 @@ paths:
           description: Deleted.
   /boards/{boardID}/columns:
     get:
-      tags: [Columns]
+      tags: [ Columns ]
       summary: List board columns.
       operationId: listColumns
       parameters:
@@ -165,7 +168,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Column'
     post:
-      tags: [Columns]
+      tags: [ Columns ]
       summary: Create a column.
       operationId: createColumn
       parameters:
@@ -185,7 +188,7 @@ paths:
                 $ref: '#/components/schemas/Column'
   /boards/{boardID}/columns/reorder:
     patch:
-      tags: [Columns]
+      tags: [ Columns ]
       summary: Reorder board columns.
       operationId: reorderColumns
       parameters:
@@ -196,7 +199,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [column_ids]
+              required: [ column_ids ]
               properties:
                 column_ids:
                   type: array
@@ -208,7 +211,7 @@ paths:
           description: Reordered.
   /boards/{boardID}/tickets:
     get:
-      tags: [Tickets]
+      tags: [ Tickets ]
       summary: List tickets on a board.
       operationId: listBoardTickets
       parameters:
@@ -224,7 +227,7 @@ paths:
                   $ref: '#/components/schemas/Ticket'
   /columns/{columnID}:
     patch:
-      tags: [Columns]
+      tags: [ Columns ]
       summary: Update a column.
       operationId: updateColumn
       parameters:
@@ -244,7 +247,7 @@ paths:
                 $ref: '#/components/schemas/Column'
   /columns/{columnID}/tickets:
     post:
-      tags: [Tickets]
+      tags: [ Tickets ]
       summary: Create a ticket in a column.
       operationId: createTicket
       parameters:
@@ -264,7 +267,7 @@ paths:
                 $ref: '#/components/schemas/Ticket'
   /tickets/{ticketID}:
     get:
-      tags: [Tickets]
+      tags: [ Tickets ]
       summary: Get a ticket.
       operationId: getTicket
       parameters:
@@ -277,7 +280,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/TicketDetail'
     patch:
-      tags: [Tickets]
+      tags: [ Tickets ]
       summary: Update a ticket.
       operationId: updateTicket
       parameters:
@@ -297,7 +300,7 @@ paths:
                 $ref: '#/components/schemas/Ticket'
   /tickets/{ticketID}/move:
     patch:
-      tags: [Tickets]
+      tags: [ Tickets ]
       summary: Move a ticket atomically.
       operationId: moveTicket
       parameters:
@@ -315,9 +318,151 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MoveTicketResult'
+  /tickets/{ticketID}/checklists:
+    post:
+      tags: [Checklists]
+      summary: Create a checklist on a ticket.
+      operationId: createChecklist
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChecklistRequest'
+      responses:
+        '201':
+          description: Created checklist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checklist'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /checklists/{checklistID}:
+    patch:
+      tags: [Checklists]
+      summary: Update a checklist.
+      operationId: updateChecklist
+      parameters:
+        - $ref: '#/components/parameters/ChecklistID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChecklistRequest'
+      responses:
+        '200':
+          description: Updated checklist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checklist'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Checklists]
+      summary: Delete a checklist and its items.
+      operationId: deleteChecklist
+      parameters:
+        - $ref: '#/components/parameters/ChecklistID'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /checklists/{checklistID}/items:
+    post:
+      tags: [Checklists]
+      summary: Create an item in a checklist.
+      operationId: createChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/ChecklistID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChecklistItemRequest'
+      responses:
+        '201':
+          description: Created checklist item.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistItem'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /checklist-items/{itemID}:
+    patch:
+      tags: [Checklists]
+      summary: Update a checklist item.
+      operationId: updateChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/ChecklistItemID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChecklistItemRequest'
+      responses:
+        '200':
+          description: Updated checklist item.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistItem'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Checklists]
+      summary: Delete a checklist item.
+      operationId: deleteChecklistItem
+      parameters:
+        - $ref: '#/components/parameters/ChecklistItemID'
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /tickets/{ticketID}/comments:
     get:
-      tags: [Comments]
+      tags: [ Comments ]
       summary: List ticket comments.
       operationId: listComments
       parameters:
@@ -332,7 +477,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Comment'
     post:
-      tags: [Comments]
+      tags: [ Comments ]
       summary: Add a ticket comment.
       operationId: createComment
       parameters:
@@ -352,7 +497,7 @@ paths:
                 $ref: '#/components/schemas/Comment'
   /tickets/{ticketID}/history:
     get:
-      tags: [History]
+      tags: [ History ]
       summary: List ticket history.
       operationId: listHistory
       parameters:
@@ -368,7 +513,7 @@ paths:
                   $ref: '#/components/schemas/HistoryEntry'
   /search:
     get:
-      tags: [Search]
+      tags: [ Search ]
       summary: Search tickets in a workspace.
       operationId: searchTickets
       parameters:
@@ -392,6 +537,381 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/SearchResult'
+  /webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List Webhooks
+      operationId: listWebhooks
+      responses:
+        '200':
+          description: List of webhooks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Webhook'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Webhooks]
+      summary: Create a Webhook
+      operationId: createWebhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createWebhookRequest'
+      responses:
+        '201':
+          description: Webhook created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/createWebhook'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /webhooks/{webhookID}:
+    patch:
+      tags: [Webhooks]
+      summary: Update a Webhook
+      operationId: updateWebhook
+      parameters:
+        - $ref: '#/components/parameters/WebhookID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                active:
+                  type: boolean
+                events:
+                  type: array
+                  items:
+                    type: string
+                description:
+                  type: string
+                callback_url:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Webhook updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Webhook'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Webhooks]
+      summary: Delete a Webhook
+      operationId: deleteWebhook
+      parameters:
+        - $ref: '#/components/parameters/WebhookID'
+      responses:
+        '204':
+          description: Webhook deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhooks/{webhookID}/deliveries:
+    get:
+      tags: [Webhooks]
+      summary: List Webhook Deliveries
+      operationId: listWebhookDeliveries
+      parameters:
+        - $ref: '#/components/parameters/WebhookID'
+      responses:
+        '200':
+          description: List of deliveries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Delivery'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /webhooks/{webhookID}/deliveries/{deliveryID}/redeliver:
+    post:
+      tags: [Webhooks]
+      summary: Redeliver a Webhook event
+      operationId: redeliverWebhookEvent
+      parameters:
+        - $ref: '#/components/parameters/WebhookID'
+        - name: deliveryID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Redelivery request accepted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /workspaces/{workspaceID}/github/installations:
+    get:
+      tags: [ Github ]
+      summary: List GitHub installations.
+      operationId: listGithubInstallations
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      responses:
+        '200':
+          description: Installations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubInstallation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workspaces/{workspaceID}/github/repositories:
+    get:
+      tags: [ Github ]
+      summary: List available GitHub repositories.
+      operationId: listGithubRepositories
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      responses:
+        '200':
+          description: Repositories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubRepository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workspaces/{workspaceID}/boards/{boardID}/github/repositories:
+    get:
+      tags: [ Github ]
+      summary: List GitHub repositories connected to a board.
+      operationId: listGithubBoardRepositories
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '200':
+          description: Repositories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubRepository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [ Github ]
+      summary: Replace GitHub repositories for a board.
+      operationId: replaceGithubBoardRepositories
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+        - $ref: '#/components/parameters/BoardID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ repositories ]
+              properties:
+                repositories:
+                  type: array
+                  items:
+                    type: object
+                    required: [ installation_id, github_repo_id ]
+                    properties:
+                      installation_id:
+                        type: integer
+                      github_repo_id:
+                        type: integer
+      responses:
+        '200':
+          description: Replaced repositories.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubRepository'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workspaces/{workspaceID}/github/connect/start:
+    post:
+      tags: [ Github ]
+      summary: Start GitHub App installation.
+      operationId: startGithubConnect
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                replace:
+                  type: boolean
+                board_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Started.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  setup_url:
+                    type: string
+                  state:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /workspaces/{workspaceID}/github/installations/{installationID}:
+    delete:
+      tags: [ Github ]
+      summary: Delete GitHub installation.
+      operationId: deleteGithubInstallation
+      parameters:
+        - $ref: '#/components/parameters/WorkspaceID'
+        - name: installationID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /tickets/{ticketID}/github/search:
+    get:
+      tags: [ Github ]
+      summary: Search GitHub objects for a ticket.
+      operationId: searchGithubObjects
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [issue, pull_request, branch, commit]
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Search results.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GithubSearchObjectResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /tickets/{ticketID}/github/links:
+    post:
+      tags: [ Github ]
+      summary: Link a GitHub object to a ticket.
+      operationId: createGithubLink
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GithubCreateLinkRequest'
+      responses:
+        '201':
+          description: Created link.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GithubLink'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /tickets/{ticketID}/github/links/{linkID}:
+    delete:
+      tags: [ Github ]
+      summary: Unlink a GitHub object from a ticket.
+      operationId: deleteGithubLink
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+        - name: linkID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     bearerAuth:
@@ -427,7 +947,34 @@ components:
       schema:
         type: string
         format: uuid
+    WebhookID:
+      name: webhookID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChecklistID:
+      name: checklistID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ChecklistItemID:
+      name: itemID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
   responses:
+    ValidationError:
+      description: Request parameters or body are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Missing or invalid token.
       content:
@@ -446,21 +993,27 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Invalid request body or validation error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
     Error:
       type: object
-      required: [error]
+      required: [ error ]
       properties:
         error:
           type: string
-          examples: [validation_error, unauthorized, forbidden, not_found, internal_error, rate_limited]
+          examples: [ validation_error, unauthorized, forbidden, not_found, internal_error, rate_limited ]
         fields:
           type: object
           additionalProperties:
             type: string
     User:
       type: object
-      required: [id, email, name, created_at]
+      required: [ id, email, name, created_at ]
       properties:
         id:
           type: string
@@ -597,7 +1150,11 @@ components:
           type: string
         position:
           type: integer
-        assignee_id:
+        pic_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        supervisor_id:
           type: string
           format: uuid
           nullable: true
@@ -644,6 +1201,58 @@ components:
               type: array
               items:
                 $ref: '#/components/schemas/HistoryEntry'
+            checklists:
+              type: array
+              items:
+                $ref: '#/components/schemas/Checklist'
+    Checklist:
+      type: object
+      required: [id, ticket_id, title, position, created_at, updated_at ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        position:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChecklistItem'
+    ChecklistItem:
+      type: object
+      required: [ id, checklist_id, title, is_checked, position, created_at, updated_at ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        checklist_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        is_checked:
+          type: boolean
+        position:
+          type: integer
+          minimum: 0
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
     Label:
       type: object
       properties:
@@ -757,7 +1366,11 @@ components:
           type: string
         description:
           type: string
-        assignee_id:
+        pic_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        supervisor_id:
           type: string
           format: uuid
           nullable: true
@@ -768,7 +1381,7 @@ components:
           format: date-time
     CreateBoardRequest:
       type: object
-      required: [name]
+      required: [ name ]
       properties:
         name:
           type: string
@@ -786,7 +1399,7 @@ components:
           type: string
     CreateColumnRequest:
       type: object
-      required: [name]
+      required: [ name ]
       properties:
         name:
           type: string
@@ -803,7 +1416,7 @@ components:
           type: string
     CreateTicketRequest:
       type: object
-      required: [title]
+      required: [ title ]
       properties:
         title:
           type: string
@@ -820,7 +1433,11 @@ components:
           type: string
         description_html:
           type: string
-        assignee_id:
+        pic_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        supervisor_id:
           type: string
           format: uuid
           nullable: true
@@ -834,7 +1451,7 @@ components:
           nullable: true
     MoveTicketRequest:
       type: object
-      required: [column_id, position]
+      required: [ column_id, position ]
       properties:
         column_id:
           type: string
@@ -855,11 +1472,323 @@ components:
         to_column:
           type: string
           format: uuid
+    CreateChecklistRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        position:
+          type: integer
+          minimum: 0
+    UpdateChecklistRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        position:
+          type: integer
+          minimum: 0
+    CreateChecklistItemRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        position:
+          type: integer
+          minimum: 0
+    UpdateChecklistItemRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        is_checked:
+          type: boolean
+        position:
+          type: integer
+          minimum: 0
     CreateCommentRequest:
       type: object
-      required: [body]
+      required: [ body ]
       properties:
         body:
           type: string
         body_html:
           type: string
+    createWebhookRequest:
+      type: object
+      required: [workspace_id, model_type, model_id, callback_url]
+      properties:
+        workspace_id:
+          type: string
+          format: uuid
+        model_type:
+          type: string
+          enum: [workspace, board]
+        model_id:
+          type: string
+          format: uuid
+        callback_url:
+          type: string
+          format: url
+        event:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+    Webhook:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        model_type:
+          type: string
+        model_id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        callback_url:
+          type: string
+          format: uri
+        events:
+          type: array
+          items:
+            type: string
+        active:
+          type: boolean
+        consecutive_failures:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    createWebhook:
+      allOf:
+        - $ref: '#/components/schemas/Webhook'
+        - type: object
+          properties:
+            signing_secret:
+              type: string
+    Delivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        webhook_id:
+          type: string
+          format: uuid
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        payload:
+          type: object
+          description: Raw JSON payload of the event delivery
+        status:
+          type: string
+          enum: [pending, delivering, succeeded, failed, retrying]
+        attempts:
+          type: integer
+        next_attempt_at:
+          type: string
+          format: date-time
+        response_status:
+          type: integer
+          nullable: true
+        response_body:
+          type: string
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+    GithubInstallation:
+      type: object
+      required: [ id, owner_user_id, installation_id, account_login, account_type, state, created_at, updated_at ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        owner_user_id:
+          type: string
+          format: uuid
+        installation_id:
+          type: integer
+        account_login:
+          type: string
+        account_type:
+          type: string
+        connected_by:
+          type: string
+          format: uuid
+        state:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    GithubRepository:
+      type: object
+      required: [ installation_id, github_repo_id, owner, name, full_name, private, html_url, default_branch ]
+      properties:
+        installation_id:
+          type: integer
+        installation_account_login:
+          type: string
+        installation_account_type:
+          type: string
+        github_repo_id:
+          type: integer
+        owner:
+          type: string
+        name:
+          type: string
+        full_name:
+          type: string
+        private:
+          type: boolean
+        html_url:
+          type: string
+        default_branch:
+          type: string
+    GithubSearchObjectResult:
+      type: object
+      required: [ installation_id, github_repo_id, repository_full_name, object ]
+      properties:
+        installation_id:
+          type: integer
+        github_repo_id:
+          type: integer
+        repository_full_name:
+          type: string
+        object:
+          $ref: '#/components/schemas/GithubObjectInfo'
+    GithubObjectInfo:
+      type: object
+      required: [ kind, title, state, status, html_url, metadata ]
+      properties:
+        kind:
+          type: string
+        number:
+          type: integer
+        commit_sha:
+          type: string
+        branch_name:
+          type: string
+        title:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+        html_url:
+          type: string
+        metadata:
+          type: object
+    GithubCreateLinkRequest:
+      type: object
+      required: [ installation_id, github_repo_id, kind ]
+      properties:
+        installation_id:
+          type: integer
+        github_repo_id:
+          type: integer
+        kind:
+          type: string
+        number:
+          type: integer
+        branch_name:
+          type: string
+    GithubLink:
+      type: object
+      required: [ id, ticket_id, workspace_id, board_id, github_repo_id, repository_full_name, repository_owner, repository_name, repository_html_url, kind, external_key, title, state, status, html_url, metadata, created_at, updated_at ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        ticket_id:
+          type: string
+          format: uuid
+        workspace_id:
+          type: string
+          format: uuid
+        board_id:
+          type: string
+          format: uuid
+        github_installation_id:
+          type: integer
+        github_repo_id:
+          type: integer
+        repository_full_name:
+          type: string
+        repository_owner:
+          type: string
+        repository_name:
+          type: string
+        repository_html_url:
+          type: string
+        kind:
+          type: string
+        external_key:
+          type: string
+        number:
+          type: integer
+        commit_sha:
+          type: string
+        branch_name:
+          type: string
+        title:
+          type: string
+        state:
+          type: string
+        status:
+          type: string
+        html_url:
+          type: string
+        metadata:
+          type: object
+        last_synced_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
