@@ -25,6 +25,13 @@ from mello.models import (
     Checklist,
     ChecklistItem,
     Attachment,
+    Webhook,
+    Delivery,
+    GithubInstallation,
+    GithubRepository,
+    GithubObjectInfo,
+    GithubSearchObjectResult,
+    GithubLink,
 )
 
 __all__ = [
@@ -54,4 +61,11 @@ __all__ = [
     "Checklist",
     "ChecklistItem",
     "Attachment",
+    "Webhook",
+    "Delivery",
+    "GithubInstallation",
+    "GithubRepository",
+    "GithubObjectInfo",
+    "GithubSearchObjectResult",
+    "GithubLink",
 ]

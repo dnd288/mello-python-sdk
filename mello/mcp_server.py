@@ -83,7 +83,8 @@ def _ticket_update_kwargs(updates: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "title",
             "description",
             "description_html",
-            "assignee_id",
+            "pic_user_id",
+            "supervisor_id",
             "start_date",
             "end_date",
         ],
@@ -203,7 +204,7 @@ def create_mcp_server(
 
     @server.tool()
     def update_ticket(ticket_id: str, updates: Optional[Dict[str, Any]] = None) -> Any:
-        """Update ticket fields, including nullable assignee and date fields."""
+        """Update ticket fields, including nullable pic_user_id, supervisor_id, and date fields."""
         kwargs = _ticket_update_kwargs(updates)
         return _serialize(client().update_ticket(ticket_id, **kwargs))
 
@@ -235,19 +236,195 @@ def create_mcp_server(
         return _serialize(client().search_tickets(workspace_id, q))
 
     @server.tool()
-    def create_checklist(ticket_id: str, title: str) -> Any:
+    def create_checklist(
+        ticket_id: str, title: str, position: Optional[int] = None
+    ) -> Any:
         """Create a checklist for a ticket."""
-        return _serialize(client().create_checklist(ticket_id, title))
+        return _serialize(client().create_checklist(ticket_id, title, position))
 
     @server.tool()
-    def create_checklist_item(checklist_id: str, title: str) -> Any:
+    def update_checklist(
+        checklist_id: str, updates: Optional[Dict[str, Any]] = None
+    ) -> Any:
+        """Update checklist fields: title, position."""
+        kwargs = _present_update_kwargs(updates, ["title", "position"])
+        return _serialize(client().update_checklist(checklist_id, **kwargs))
+
+    @server.tool()
+    def delete_checklist(checklist_id: str) -> None:
+        """Delete a checklist and its items."""
+        client().delete_checklist(checklist_id)
+        return None
+
+    @server.tool()
+    def create_checklist_item(
+        checklist_id: str, title: str, position: Optional[int] = None
+    ) -> Any:
         """Create an item inside a checklist."""
-        return _serialize(client().create_checklist_item(checklist_id, title))
+        return _serialize(
+            client().create_checklist_item(checklist_id, title, position)
+        )
 
     @server.tool()
-    def update_checklist_item(checklist_item_id: str, is_checked: bool) -> Any:
-        """Update a checklist item's state (checked/unchecked)."""
-        return _serialize(client().update_checklist_item(checklist_item_id, is_checked))
+    def update_checklist_item(
+        checklist_item_id: str, updates: Optional[Dict[str, Any]] = None
+    ) -> Any:
+        """Update checklist item fields: title, is_checked, position."""
+        kwargs = _present_update_kwargs(
+            updates, ["title", "is_checked", "position"]
+        )
+        return _serialize(
+            client().update_checklist_item(checklist_item_id, **kwargs)
+        )
+
+    @server.tool()
+    def delete_checklist_item(checklist_item_id: str) -> None:
+        """Delete a checklist item."""
+        client().delete_checklist_item(checklist_item_id)
+        return None
+
+    @server.tool()
+    def list_webhooks() -> Any:
+        """List webhooks."""
+        return _serialize(client().list_webhooks())
+
+    @server.tool()
+    def create_webhook(
+        workspace_id: str,
+        model_type: str,
+        model_id: str,
+        callback_url: str,
+        event: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> Any:
+        """Create a webhook."""
+        return _serialize(
+            client().create_webhook(
+                workspace_id,
+                model_type,
+                model_id,
+                callback_url,
+                event=event,
+                description=description,
+            )
+        )
+
+    @server.tool()
+    def update_webhook(
+        webhook_id: str, updates: Optional[Dict[str, Any]] = None
+    ) -> Any:
+        """Update webhook fields: active, events, description, callback_url."""
+        kwargs = _present_update_kwargs(
+            updates, ["active", "events", "description", "callback_url"]
+        )
+        return _serialize(client().update_webhook(webhook_id, **kwargs))
+
+    @server.tool()
+    def delete_webhook(webhook_id: str) -> None:
+        """Delete a webhook."""
+        client().delete_webhook(webhook_id)
+        return None
+
+    @server.tool()
+    def list_webhook_deliveries(webhook_id: str) -> Any:
+        """List webhook delivery attempts."""
+        return _serialize(client().list_webhook_deliveries(webhook_id))
+
+    @server.tool()
+    def redeliver_webhook_event(webhook_id: str, delivery_id: str) -> None:
+        """Redeliver a webhook event delivery."""
+        client().redeliver_webhook_event(webhook_id, delivery_id)
+        return None
+
+    @server.tool()
+    def list_github_installations(workspace_id: str) -> Any:
+        """List GitHub installations in a workspace."""
+        return _serialize(client().list_github_installations(workspace_id))
+
+    @server.tool()
+    def list_github_repositories(workspace_id: str) -> Any:
+        """List GitHub repositories in a workspace."""
+        return _serialize(client().list_github_repositories(workspace_id))
+
+    @server.tool()
+    def list_github_board_repositories(workspace_id: str, board_id: str) -> Any:
+        """List GitHub repositories connected to a board."""
+        return _serialize(
+            client().list_github_board_repositories(workspace_id, board_id)
+        )
+
+    @server.tool()
+    def replace_github_board_repositories(
+        workspace_id: str, board_id: str, repositories: List[Dict[str, int]]
+    ) -> Any:
+        """Replace GitHub repositories connected to a board."""
+        return _serialize(
+            client().replace_github_board_repositories(
+                workspace_id, board_id, repositories
+            )
+        )
+
+    @server.tool()
+    def start_github_connect(
+        workspace_id: str,
+        replace: Optional[bool] = None,
+        board_id: Optional[str] = None,
+    ) -> Any:
+        """Start GitHub App installation flow."""
+        return _serialize(
+            client().start_github_connect(
+                workspace_id, replace=replace, board_id=board_id
+            )
+        )
+
+    @server.tool()
+    def delete_github_installation(
+        workspace_id: str, installation_id: str
+    ) -> None:
+        """Delete a GitHub installation from a workspace."""
+        client().delete_github_installation(workspace_id, installation_id)
+        return None
+
+    @server.tool()
+    def search_github_objects(
+        ticket_id: str,
+        q: Optional[str] = None,
+        type: Optional[str] = None,
+        page: Optional[int] = None,
+    ) -> Any:
+        """Search GitHub objects for a ticket."""
+        return _serialize(
+            client().search_github_objects(ticket_id, q=q, type=type, page=page)
+        )
+
+    @server.tool()
+    def create_github_link(
+        ticket_id: str,
+        installation_id: int,
+        github_repo_id: int,
+        kind: str,
+        number: Optional[int] = None,
+        branch_name: Optional[str] = None,
+    ) -> Any:
+        """Link a GitHub object to a ticket."""
+        return _serialize(
+            client().create_github_link(
+                ticket_id,
+                installation_id,
+                github_repo_id,
+                kind,
+                number=number,
+                branch_name=branch_name,
+            )
+        )
+
+    @server.tool()
+    def delete_github_link(ticket_id: str, link_id: str) -> None:
+        """Unlink a GitHub object from a ticket."""
+        client().delete_github_link(ticket_id, link_id)
+        return None
+
+    @server.tool()
 
     @server.tool()
     def create_attachment(

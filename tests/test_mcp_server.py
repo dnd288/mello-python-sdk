@@ -187,19 +187,33 @@ class FakeClient:
         self.calls.append(("search_tickets", workspace_id, q))
         return [{"workspace_id": workspace_id, "q": q}]
 
-    def create_checklist(self, ticket_id: str, title: str) -> Dict[str, Any]:
-        self.calls.append(("create_checklist", ticket_id, title))
+    def create_checklist(
+        self, ticket_id: str, title: str, position: Optional[int] = None
+    ) -> Dict[str, Any]:
+        self.calls.append(("create_checklist", ticket_id, title, position))
         return {"ticket_id": ticket_id, "title": title, "id": "chk-1"}
 
-    def create_checklist_item(self, checklist_id: str, title: str) -> Dict[str, Any]:
-        self.calls.append(("create_checklist_item", checklist_id, title))
+    def update_checklist(self, checklist_id: str, **kwargs: Any) -> Dict[str, Any]:
+        self.calls.append(("update_checklist", checklist_id, kwargs))
+        return {"id": checklist_id, **kwargs}
+
+    def delete_checklist(self, checklist_id: str) -> None:
+        self.calls.append(("delete_checklist", checklist_id))
+
+    def create_checklist_item(
+        self, checklist_id: str, title: str, position: Optional[int] = None
+    ) -> Dict[str, Any]:
+        self.calls.append(("create_checklist_item", checklist_id, title, position))
         return {"checklist_id": checklist_id, "title": title, "id": "chki-1"}
 
     def update_checklist_item(
-        self, checklist_item_id: str, is_checked: bool
+        self, checklist_item_id: str, **kwargs: Any
     ) -> Dict[str, Any]:
-        self.calls.append(("update_checklist_item", checklist_item_id, is_checked))
-        return {"id": checklist_item_id, "is_checked": is_checked}
+        self.calls.append(("update_checklist_item", checklist_item_id, kwargs))
+        return {"id": checklist_item_id, **kwargs}
+
+    def delete_checklist_item(self, checklist_item_id: str) -> None:
+        self.calls.append(("delete_checklist_item", checklist_item_id))
 
     def create_attachment(
         self,
@@ -236,8 +250,15 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "create_checklist_item",
         "create_column",
         "create_comment",
+        "create_github_link",
         "create_ticket",
+        "create_webhook",
         "delete_board",
+        "delete_checklist",
+        "delete_checklist_item",
+        "delete_github_installation",
+        "delete_github_link",
+        "delete_webhook",
         "download_attachment",
         "get_board",
         "get_current_user",
@@ -245,17 +266,28 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "list_board_tickets",
         "list_columns",
         "list_comments",
+        "list_github_board_repositories",
+        "list_github_installations",
+        "list_github_repositories",
         "list_history",
+        "list_webhook_deliveries",
+        "list_webhooks",
         "list_workspace_boards",
         "list_workspace_members",
         "list_workspaces",
         "move_ticket",
+        "redeliver_webhook_event",
         "reorder_columns",
+        "replace_github_board_repositories",
+        "search_github_objects",
         "search_tickets",
+        "start_github_connect",
         "update_board",
+        "update_checklist",
         "update_checklist_item",
         "update_column",
         "update_ticket",
+        "update_webhook",
     ]
 
 
@@ -278,17 +310,17 @@ def test_registered_tools_delegate_to_client_and_serialize_results() -> None:
         "title": "Setup",
         "id": "chk-1",
     }
-    assert client.calls[-1] == ("create_checklist", "ticket-1", "Setup")
+    assert client.calls[-1] == ("create_checklist", "ticket-1", "Setup", None)
 
     assert server.tools["create_checklist_item"](
         checklist_id="chk-1", title="Task 1"
     ) == {"checklist_id": "chk-1", "title": "Task 1", "id": "chki-1"}
-    assert client.calls[-1] == ("create_checklist_item", "chk-1", "Task 1")
+    assert client.calls[-1] == ("create_checklist_item", "chk-1", "Task 1", None)
 
     assert server.tools["update_checklist_item"](
-        checklist_item_id="chki-1", is_checked=True
+        checklist_item_id="chki-1", updates={"is_checked": True}
     ) == {"id": "chki-1", "is_checked": True}
-    assert client.calls[-1] == ("update_checklist_item", "chki-1", True)
+    assert client.calls[-1] == ("update_checklist_item", "chki-1", {"is_checked": True})
 
     # Attachment tests
     import base64
@@ -319,14 +351,14 @@ def test_update_tools_preserve_omitted_and_explicit_null_values() -> None:
 
     assert server.tools["update_ticket"](
         ticket_id="ticket-1",
-        updates={"title": "New title", "assignee_id": None},
-    ) == {"id": "ticket-1", "title": "New title", "assignee_id": None}
+        updates={"title": "New title", "pic_user_id": None},
+    ) == {"id": "ticket-1", "title": "New title", "pic_user_id": None}
 
     method, ticket_id, kwargs = client.calls[-1]
     assert method == "update_ticket"
     assert ticket_id == "ticket-1"
     assert kwargs["title"] == "New title"
-    assert kwargs["assignee_id"] is None
+    assert kwargs["pic_user_id"] is None
     assert "description" not in kwargs
 
     server.tools["update_board"](board_id="board-1", updates={})

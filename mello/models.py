@@ -207,7 +207,8 @@ class Ticket:
     description_html: str
     position: int
     board_code: str = ""
-    assignee_id: Optional[str] = None
+    pic_user_id: Optional[str] = None
+    supervisor_id: Optional[str] = None
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     created_at: Optional[datetime] = None
@@ -233,7 +234,8 @@ class Ticket:
             description_html=data.get("description_html", ""),
             position=data.get("position", 0),
             board_code=data.get("board_code", ""),
-            assignee_id=data.get("assignee_id"),
+            pic_user_id=data.get("pic_user_id"),
+            supervisor_id=data.get("supervisor_id"),
             start_date=parse_datetime(data.get("start_date")),
             end_date=parse_datetime(data.get("end_date")),
             created_at=parse_datetime(data.get("created_at")),
@@ -386,7 +388,8 @@ class TicketDetail(Ticket):
             description_html=base_ticket.description_html,
             position=base_ticket.position,
             board_code=base_ticket.board_code or data.get("board_code", ""),
-            assignee_id=base_ticket.assignee_id,
+            pic_user_id=base_ticket.pic_user_id,
+            supervisor_id=base_ticket.supervisor_id,
             start_date=base_ticket.start_date,
             end_date=base_ticket.end_date,
             created_at=base_ticket.created_at,
@@ -422,7 +425,8 @@ class SearchResult:
     title: str
     description: str
     rank: float
-    assignee_id: Optional[str] = None
+    pic_user_id: Optional[str] = None
+    supervisor_id: Optional[str] = None
     updated_at: Optional[datetime] = None
 
     @classmethod
@@ -440,7 +444,8 @@ class SearchResult:
             title=data.get("title", ""),
             description=data.get("description", ""),
             rank=data.get("rank", 0.0),
-            assignee_id=data.get("assignee_id"),
+            pic_user_id=data.get("pic_user_id"),
+            supervisor_id=data.get("supervisor_id"),
             updated_at=parse_datetime(data.get("updated_at")),
         )
 
@@ -459,4 +464,235 @@ class MoveTicketResult:
             workspace_id=data.get("workspace_id", ""),
             from_column=data.get("from_column", ""),
             to_column=data.get("to_column", ""),
+        )
+
+
+@dataclass
+class Webhook:
+    id: str
+    user_id: str
+    workspace_id: str
+    model_type: str
+    model_id: str
+    callback_url: str
+    description: Optional[str] = None
+    events: List[str] = field(default_factory=list)
+    active: bool = True
+    consecutive_failures: int = 0
+    signing_secret: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Webhook":
+        events_data = data.get("events") or []
+        return cls(
+            id=data.get("id", ""),
+            user_id=data.get("user_id", ""),
+            workspace_id=data.get("workspace_id", ""),
+            model_type=data.get("model_type", ""),
+            model_id=data.get("model_id", ""),
+            callback_url=data.get("callback_url", ""),
+            description=data.get("description"),
+            events=events_data,
+            active=data.get("active", True),
+            consecutive_failures=data.get("consecutive_failures", 0),
+            signing_secret=data.get("signing_secret"),
+            created_at=parse_datetime(data.get("created_at")),
+            updated_at=parse_datetime(data.get("updated_at")),
+        )
+
+
+@dataclass
+class Delivery:
+    id: str
+    webhook_id: str
+    event_id: str
+    event_type: str
+    status: str
+    attempts: int
+    payload: Dict[str, Any] = field(default_factory=dict)
+    next_attempt_at: Optional[datetime] = None
+    response_status: Optional[int] = None
+    response_body: Optional[str] = None
+    error: Optional[str] = None
+    created_at: Optional[datetime] = None
+    delivered_at: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Delivery":
+        return cls(
+            id=data.get("id", ""),
+            webhook_id=data.get("webhook_id", ""),
+            event_id=data.get("event_id", ""),
+            event_type=data.get("event_type", ""),
+            status=data.get("status", ""),
+            attempts=data.get("attempts", 0),
+            payload=data.get("payload") or {},
+            next_attempt_at=parse_datetime(data.get("next_attempt_at")),
+            response_status=data.get("response_status"),
+            response_body=data.get("response_body"),
+            error=data.get("error"),
+            created_at=parse_datetime(data.get("created_at")),
+            delivered_at=parse_datetime(data.get("delivered_at")),
+        )
+
+
+@dataclass
+class GithubInstallation:
+    id: str
+    owner_user_id: str
+    installation_id: int
+    account_login: str
+    account_type: str
+    state: str
+    workspace_id: Optional[str] = None
+    connected_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GithubInstallation":
+        return cls(
+            id=data.get("id", ""),
+            owner_user_id=data.get("owner_user_id", ""),
+            installation_id=data.get("installation_id", 0),
+            account_login=data.get("account_login", ""),
+            account_type=data.get("account_type", ""),
+            state=data.get("state", ""),
+            workspace_id=data.get("workspace_id"),
+            connected_by=data.get("connected_by"),
+            created_at=parse_datetime(data.get("created_at")),
+            updated_at=parse_datetime(data.get("updated_at")),
+        )
+
+
+@dataclass
+class GithubRepository:
+    installation_id: int
+    github_repo_id: int
+    owner: str
+    name: str
+    full_name: str
+    private: bool
+    html_url: str
+    default_branch: str
+    installation_account_login: Optional[str] = None
+    installation_account_type: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GithubRepository":
+        return cls(
+            installation_id=data.get("installation_id", 0),
+            github_repo_id=data.get("github_repo_id", 0),
+            owner=data.get("owner", ""),
+            name=data.get("name", ""),
+            full_name=data.get("full_name", ""),
+            private=data.get("private", False),
+            html_url=data.get("html_url", ""),
+            default_branch=data.get("default_branch", ""),
+            installation_account_login=data.get("installation_account_login"),
+            installation_account_type=data.get("installation_account_type"),
+        )
+
+
+@dataclass
+class GithubObjectInfo:
+    kind: str
+    title: str
+    state: str
+    status: str
+    html_url: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    number: Optional[int] = None
+    commit_sha: Optional[str] = None
+    branch_name: Optional[str] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GithubObjectInfo":
+        return cls(
+            kind=data.get("kind", ""),
+            title=data.get("title", ""),
+            state=data.get("state", ""),
+            status=data.get("status", ""),
+            html_url=data.get("html_url", ""),
+            metadata=data.get("metadata") or {},
+            number=data.get("number"),
+            commit_sha=data.get("commit_sha"),
+            branch_name=data.get("branch_name"),
+        )
+
+
+@dataclass
+class GithubSearchObjectResult:
+    installation_id: int
+    github_repo_id: int
+    repository_full_name: str
+    object: GithubObjectInfo
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GithubSearchObjectResult":
+        obj_data = data.get("object") or {}
+        return cls(
+            installation_id=data.get("installation_id", 0),
+            github_repo_id=data.get("github_repo_id", 0),
+            repository_full_name=data.get("repository_full_name", ""),
+            object=GithubObjectInfo.from_dict(obj_data),
+        )
+
+
+@dataclass
+class GithubLink:
+    id: str
+    ticket_id: str
+    workspace_id: str
+    board_id: str
+    github_repo_id: int
+    repository_full_name: str
+    repository_owner: str
+    repository_name: str
+    repository_html_url: str
+    kind: str
+    external_key: str
+    title: str
+    state: str
+    status: str
+    html_url: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    github_installation_id: Optional[int] = None
+    number: Optional[int] = None
+    commit_sha: Optional[str] = None
+    branch_name: Optional[str] = None
+    last_synced_at: Optional[datetime] = None
+    created_by: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GithubLink":
+        return cls(
+            id=data.get("id", ""),
+            ticket_id=data.get("ticket_id", ""),
+            workspace_id=data.get("workspace_id", ""),
+            board_id=data.get("board_id", ""),
+            github_repo_id=data.get("github_repo_id", 0),
+            repository_full_name=data.get("repository_full_name", ""),
+            repository_owner=data.get("repository_owner", ""),
+            repository_name=data.get("repository_name", ""),
+            repository_html_url=data.get("repository_html_url", ""),
+            kind=data.get("kind", ""),
+            external_key=data.get("external_key", ""),
+            title=data.get("title", ""),
+            state=data.get("state", ""),
+            status=data.get("status", ""),
+            html_url=data.get("html_url", ""),
+            metadata=data.get("metadata") or {},
+            github_installation_id=data.get("github_installation_id"),
+            number=data.get("number"),
+            commit_sha=data.get("commit_sha"),
+            branch_name=data.get("branch_name"),
+            last_synced_at=parse_datetime(data.get("last_synced_at")),
+            created_by=data.get("created_by"),
+            created_at=parse_datetime(data.get("created_at")),
+            updated_at=parse_datetime(data.get("updated_at")),
         )

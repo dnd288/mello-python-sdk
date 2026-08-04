@@ -18,6 +18,12 @@ from mello.models import (
     Checklist,
     ChecklistItem,
     Attachment,
+    Webhook,
+    Delivery,
+    GithubInstallation,
+    GithubRepository,
+    GithubSearchObjectResult,
+    GithubLink,
 )
 
 
@@ -381,7 +387,8 @@ class MelloClient:
         title: Union[str, UnsetType] = UNSET,
         description: Union[str, UnsetType] = UNSET,
         description_html: Union[str, UnsetType] = UNSET,
-        assignee_id: Union[Optional[str], UnsetType] = UNSET,
+        pic_user_id: Union[Optional[str], UnsetType] = UNSET,
+        supervisor_id: Union[Optional[str], UnsetType] = UNSET,
         start_date: Union[Optional[datetime], UnsetType] = UNSET,
         end_date: Union[Optional[datetime], UnsetType] = UNSET,
     ) -> Ticket:
@@ -393,8 +400,8 @@ class MelloClient:
             title: Optional updated title.
             description: Optional updated description text.
             description_html: Optional updated HTML description.
-            assignee_id: Optional user UUID string to assign, or None to unassign
-                (or empty string/sentinel depending on backend API).
+            pic_user_id: Optional user UUID string to set as PIC, or None.
+            supervisor_id: Optional user UUID string to set as supervisor, or None.
             start_date: Optional start date datetime.
             end_date: Optional end date datetime.
 
@@ -408,8 +415,10 @@ class MelloClient:
             payload["description"] = description
         if not isinstance(description_html, UnsetType):
             payload["description_html"] = description_html
-        if not isinstance(assignee_id, UnsetType):
-            payload["assignee_id"] = assignee_id
+        if not isinstance(pic_user_id, UnsetType):
+            payload["pic_user_id"] = pic_user_id
+        if not isinstance(supervisor_id, UnsetType):
+            payload["supervisor_id"] = supervisor_id
         if not isinstance(start_date, UnsetType):
             payload["start_date"] = self._format_datetime(start_date)
         if not isinstance(end_date, UnsetType):
@@ -523,40 +532,292 @@ class MelloClient:
 
     # --- Checklists Tag ---
 
-    def create_checklist(self, ticket_id: str, title: str) -> Checklist:
+    def create_checklist(
+        self, ticket_id: str, title: str, position: Optional[int] = None
+    ) -> Checklist:
         """
         Create a checklist for a ticket.
         """
-        payload = {"title": title}
-        data = self._request(
-            "POST", f"/tickets/{ticket_id}/checklists", json_data=payload, use_v1=False
-        )
+        payload: Dict[str, Any] = {"title": title}
+        if position is not None:
+            payload["position"] = position
+        data = self._request("POST", f"/tickets/{ticket_id}/checklists", json_data=payload)
         return Checklist.from_dict(data)
 
-    def create_checklist_item(self, checklist_id: str, title: str) -> ChecklistItem:
+    def update_checklist(
+        self,
+        checklist_id: str,
+        title: Union[str, UnsetType] = UNSET,
+        position: Union[int, UnsetType] = UNSET,
+    ) -> Checklist:
+        """
+        Update a checklist.
+        """
+        payload: Dict[str, Any] = {}
+        if not isinstance(title, UnsetType):
+            payload["title"] = title
+        if not isinstance(position, UnsetType):
+            payload["position"] = position
+
+        data = self._request("PATCH", f"/checklists/{checklist_id}", json_data=payload)
+        return Checklist.from_dict(data)
+
+    def delete_checklist(self, checklist_id: str) -> None:
+        """
+        Delete a checklist and its items.
+        """
+        self._request("DELETE", f"/checklists/{checklist_id}")
+
+    def create_checklist_item(
+        self, checklist_id: str, title: str, position: Optional[int] = None
+    ) -> ChecklistItem:
         """
         Create an item inside a checklist.
         """
-        payload = {"title": title}
+        payload: Dict[str, Any] = {"title": title}
+        if position is not None:
+            payload["position"] = position
         data = self._request(
-            "POST", f"/checklists/{checklist_id}/items", json_data=payload, use_v1=False
+            "POST", f"/checklists/{checklist_id}/items", json_data=payload
         )
         return ChecklistItem.from_dict(data)
 
     def update_checklist_item(
-        self, checklist_item_id: str, is_checked: bool
+        self,
+        checklist_item_id: str,
+        title: Union[str, UnsetType] = UNSET,
+        is_checked: Union[bool, UnsetType] = UNSET,
+        position: Union[int, UnsetType] = UNSET,
     ) -> ChecklistItem:
         """
-        Update a checklist item's state (checked/unchecked).
+        Update a checklist item's properties (title, is_checked, position).
         """
-        payload = {"is_checked": is_checked}
+        payload: Dict[str, Any] = {}
+        if not isinstance(title, UnsetType):
+            payload["title"] = title
+        if not isinstance(is_checked, UnsetType):
+            payload["is_checked"] = is_checked
+        if not isinstance(position, UnsetType):
+            payload["position"] = position
+
         data = self._request(
-            "PATCH",
-            f"/checklist-items/{checklist_item_id}",
-            json_data=payload,
-            use_v1=False,
+            "PATCH", f"/checklist-items/{checklist_item_id}", json_data=payload
         )
         return ChecklistItem.from_dict(data)
+
+    def delete_checklist_item(self, checklist_item_id: str) -> None:
+        """
+        Delete a checklist item.
+        """
+        self._request("DELETE", f"/checklist-items/{checklist_item_id}")
+
+    # --- Webhooks Tag ---
+
+    def list_webhooks(self) -> List[Webhook]:
+        """
+        List webhooks.
+        """
+        data = self._request("GET", "/webhooks")
+        return [Webhook.from_dict(w) for w in (data or [])]
+
+    def create_webhook(
+        self,
+        workspace_id: str,
+        model_type: str,
+        model_id: str,
+        callback_url: str,
+        event: Optional[List[str]] = None,
+        description: Optional[str] = None,
+    ) -> Webhook:
+        """
+        Create a webhook.
+        """
+        payload: Dict[str, Any] = {
+            "workspace_id": workspace_id,
+            "model_type": model_type,
+            "model_id": model_id,
+            "callback_url": callback_url,
+        }
+        if event is not None:
+            payload["event"] = event
+        if description is not None:
+            payload["description"] = description
+
+        data = self._request("POST", "/webhooks", json_data=payload)
+        return Webhook.from_dict(data)
+
+    def update_webhook(
+        self,
+        webhook_id: str,
+        active: Union[bool, UnsetType] = UNSET,
+        events: Union[List[str], UnsetType] = UNSET,
+        description: Union[Optional[str], UnsetType] = UNSET,
+        callback_url: Union[str, UnsetType] = UNSET,
+    ) -> Webhook:
+        """
+        Update a webhook.
+        """
+        payload: Dict[str, Any] = {}
+        if not isinstance(active, UnsetType):
+            payload["active"] = active
+        if not isinstance(events, UnsetType):
+            payload["events"] = events
+        if not isinstance(description, UnsetType):
+            payload["description"] = description
+        if not isinstance(callback_url, UnsetType):
+            payload["callback_url"] = callback_url
+
+        data = self._request("PATCH", f"/webhooks/{webhook_id}", json_data=payload)
+        return Webhook.from_dict(data)
+
+    def delete_webhook(self, webhook_id: str) -> None:
+        """
+        Delete a webhook.
+        """
+        self._request("DELETE", f"/webhooks/{webhook_id}")
+
+    def list_webhook_deliveries(self, webhook_id: str) -> List[Delivery]:
+        """
+        List webhook deliveries.
+        """
+        data = self._request("GET", f"/webhooks/{webhook_id}/deliveries")
+        return [Delivery.from_dict(d) for d in (data or [])]
+
+    def redeliver_webhook_event(self, webhook_id: str, delivery_id: str) -> None:
+        """
+        Redeliver a webhook event delivery.
+        """
+        self._request("POST", f"/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver")
+
+    # --- GitHub Tag ---
+
+    def list_github_installations(self, workspace_id: str) -> List[GithubInstallation]:
+        """
+        List GitHub installations in a workspace.
+        """
+        data = self._request("GET", f"/workspaces/{workspace_id}/github/installations")
+        return [GithubInstallation.from_dict(gi) for gi in (data or [])]
+
+    def list_github_repositories(self, workspace_id: str) -> List[GithubRepository]:
+        """
+        List GitHub repositories in a workspace.
+        """
+        data = self._request("GET", f"/workspaces/{workspace_id}/github/repositories")
+        return [GithubRepository.from_dict(gr) for gr in (data or [])]
+
+    def list_github_board_repositories(
+        self, workspace_id: str, board_id: str
+    ) -> List[GithubRepository]:
+        """
+        List GitHub repositories connected to a board.
+        """
+        data = self._request(
+            "GET", f"/workspaces/{workspace_id}/boards/{board_id}/github/repositories"
+        )
+        return [GithubRepository.from_dict(gr) for gr in (data or [])]
+
+    def replace_github_board_repositories(
+        self, workspace_id: str, board_id: str, repositories: List[Dict[str, int]]
+    ) -> List[GithubRepository]:
+        """
+        Replace GitHub repositories connected to a board.
+        """
+        payload = {"repositories": repositories}
+        data = self._request(
+            "PUT",
+            f"/workspaces/{workspace_id}/boards/{board_id}/github/repositories",
+            json_data=payload,
+        )
+        return [GithubRepository.from_dict(gr) for gr in (data or [])]
+
+    def start_github_connect(
+        self,
+        workspace_id: str,
+        replace: Optional[bool] = None,
+        board_id: Optional[str] = None,
+    ) -> Dict[str, str]:
+        """
+        Start GitHub App installation flow.
+        """
+        payload: Dict[str, Any] = {}
+        if replace is not None:
+            payload["replace"] = replace
+        if board_id is not None:
+            payload["board_id"] = board_id
+
+        data = self._request(
+            "POST",
+            f"/workspaces/{workspace_id}/github/connect/start",
+            json_data=payload if payload else None,
+        )
+        return data or {}
+
+    def delete_github_installation(
+        self, workspace_id: str, installation_id: str
+    ) -> None:
+        """
+        Delete a GitHub installation from a workspace.
+        """
+        self._request(
+            "DELETE",
+            f"/workspaces/{workspace_id}/github/installations/{installation_id}",
+        )
+
+    def search_github_objects(
+        self,
+        ticket_id: str,
+        q: Optional[str] = None,
+        type: Optional[str] = None,
+        page: Optional[int] = None,
+    ) -> List[GithubSearchObjectResult]:
+        """
+        Search GitHub objects for a ticket.
+        """
+        params: Dict[str, Any] = {}
+        if q is not None:
+            params["q"] = q
+        if type is not None:
+            params["type"] = type
+        if page is not None:
+            params["page"] = page
+
+        data = self._request(
+            "GET", f"/tickets/{ticket_id}/github/search", params=params if params else None
+        )
+        return [GithubSearchObjectResult.from_dict(res) for res in (data or [])]
+
+    def create_github_link(
+        self,
+        ticket_id: str,
+        installation_id: int,
+        github_repo_id: int,
+        kind: str,
+        number: Optional[int] = None,
+        branch_name: Optional[str] = None,
+    ) -> GithubLink:
+        """
+        Link a GitHub object to a ticket.
+        """
+        payload: Dict[str, Any] = {
+            "installation_id": installation_id,
+            "github_repo_id": github_repo_id,
+            "kind": kind,
+        }
+        if number is not None:
+            payload["number"] = number
+        if branch_name is not None:
+            payload["branch_name"] = branch_name
+
+        data = self._request(
+            "POST", f"/tickets/{ticket_id}/github/links", json_data=payload
+        )
+        return GithubLink.from_dict(data)
+
+    def delete_github_link(self, ticket_id: str, link_id: str) -> None:
+        """
+        Unlink a GitHub object from a ticket.
+        """
+        self._request("DELETE", f"/tickets/{ticket_id}/github/links/{link_id}")
 
     # --- Attachments Tag ---
 

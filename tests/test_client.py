@@ -493,7 +493,8 @@ def test_update_ticket(client: MelloClient) -> None:
         "description": "Updated Desc",
         "description_html": "<p>Updated Desc</p>",
         "position": 1,
-        "assignee_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+        "pic_user_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+        "supervisor_id": None,
     }
     responses.add(
         responses.PATCH,
@@ -503,7 +504,7 @@ def test_update_ticket(client: MelloClient) -> None:
                 {
                     "title": "Updated Title",
                     "description": "Updated Desc",
-                    "assignee_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+                    "pic_user_id": "e3b0c442-98fc-1c14-9afb-f4c8996fb924",
                     "start_date": "2026-06-08T00:00:00+00:00",
                 }
             )
@@ -516,11 +517,11 @@ def test_update_ticket(client: MelloClient) -> None:
         ticket_id,
         title="Updated Title",
         description="Updated Desc",
-        assignee_id="e3b0c442-98fc-1c14-9afb-f4c8996fb924",
+        pic_user_id="e3b0c442-98fc-1c14-9afb-f4c8996fb924",
         start_date=datetime(2026, 6, 8, 0, 0, 0, tzinfo=timezone.utc),
     )
     assert ticket.title == "Updated Title"
-    assert ticket.assignee_id == "e3b0c442-98fc-1c14-9afb-f4c8996fb924"
+    assert ticket.pic_user_id == "e3b0c442-98fc-1c14-9afb-f4c8996fb924"
 
 
 @responses.activate
@@ -534,7 +535,8 @@ def test_update_ticket_clear_fields(client: MelloClient) -> None:
         "title": "Task 1",
         "description": "Task description",
         "position": 1,
-        "assignee_id": None,
+        "pic_user_id": None,
+        "supervisor_id": None,
     }
     responses.add(
         responses.PATCH,
@@ -542,7 +544,8 @@ def test_update_ticket_clear_fields(client: MelloClient) -> None:
         match=[
             responses.matchers.json_params_matcher(
                 {
-                    "assignee_id": None,
+                    "pic_user_id": None,
+                    "supervisor_id": None,
                     "start_date": None,
                     "end_date": None,
                 }
@@ -554,11 +557,12 @@ def test_update_ticket_clear_fields(client: MelloClient) -> None:
 
     ticket = client.update_ticket(
         ticket_id,
-        assignee_id=None,
+        pic_user_id=None,
+        supervisor_id=None,
         start_date=None,
         end_date=None,
     )
-    assert ticket.assignee_id is None
+    assert ticket.pic_user_id is None
 
 
 @responses.activate
@@ -773,7 +777,7 @@ def test_create_checklist(client: MelloClient) -> None:
     ticket_id = "ticket-123"
     responses.add(
         responses.POST,
-        f"https://mello.mezon.vn/api/tickets/{ticket_id}/checklists",
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/checklists",
         match=[responses.matchers.json_params_matcher({"title": "Setup"})],
         json={
             "id": "chk-1",
@@ -794,7 +798,7 @@ def test_create_checklist_item(client: MelloClient) -> None:
     checklist_id = "chk-1"
     responses.add(
         responses.POST,
-        f"https://mello.mezon.vn/api/checklists/{checklist_id}/items",
+        f"https://mello.mezon.vn/api/v1/checklists/{checklist_id}/items",
         match=[responses.matchers.json_params_matcher({"title": "Write tests"})],
         json={
             "id": "chki-1",
@@ -817,7 +821,7 @@ def test_update_checklist_item(client: MelloClient) -> None:
     item_id = "chki-1"
     responses.add(
         responses.PATCH,
-        f"https://mello.mezon.vn/api/checklist-items/{item_id}",
+        f"https://mello.mezon.vn/api/v1/checklist-items/{item_id}",
         match=[responses.matchers.json_params_matcher({"is_checked": True})],
         json={
             "id": item_id,
@@ -870,3 +874,300 @@ def test_download_attachment(client: MelloClient) -> None:
 
     content = client.download_attachment(attachment_id)
     assert content == b"filebytesdata"
+
+
+@responses.activate
+def test_webhook_endpoints(client: MelloClient) -> None:
+    # list_webhooks
+    responses.add(
+        responses.GET,
+        "https://mello.mezon.vn/api/v1/webhooks",
+        json=[
+            {
+                "id": "wh-1",
+                "user_id": "u-1",
+                "workspace_id": "ws-1",
+                "model_type": "board",
+                "model_id": "b-1",
+                "callback_url": "https://example.com/hook",
+                "events": ["ticket.created"],
+                "active": True,
+                "consecutive_failures": 0,
+            }
+        ],
+        status=200,
+    )
+    webhooks = client.list_webhooks()
+    assert len(webhooks) == 1
+    assert webhooks[0].id == "wh-1"
+    assert webhooks[0].events == ["ticket.created"]
+
+    # create_webhook
+    responses.add(
+        responses.POST,
+        "https://mello.mezon.vn/api/v1/webhooks",
+        match=[
+            responses.matchers.json_params_matcher(
+                {
+                    "workspace_id": "ws-1",
+                    "model_type": "board",
+                    "model_id": "b-1",
+                    "callback_url": "https://example.com/hook",
+                    "event": ["ticket.created"],
+                }
+            )
+        ],
+        json={
+            "id": "wh-1",
+            "user_id": "u-1",
+            "workspace_id": "ws-1",
+            "model_type": "board",
+            "model_id": "b-1",
+            "callback_url": "https://example.com/hook",
+            "events": ["ticket.created"],
+            "active": True,
+            "consecutive_failures": 0,
+            "signing_secret": "secret123",
+        },
+        status=201,
+    )
+    wh = client.create_webhook(
+        "ws-1", "board", "b-1", "https://example.com/hook", event=["ticket.created"]
+    )
+    assert wh.id == "wh-1"
+    assert wh.signing_secret == "secret123"
+
+    # update_webhook
+    responses.add(
+        responses.PATCH,
+        "https://mello.mezon.vn/api/v1/webhooks/wh-1",
+        match=[responses.matchers.json_params_matcher({"active": False})],
+        json={
+            "id": "wh-1",
+            "user_id": "u-1",
+            "workspace_id": "ws-1",
+            "model_type": "board",
+            "model_id": "b-1",
+            "callback_url": "https://example.com/hook",
+            "events": ["ticket.created"],
+            "active": False,
+            "consecutive_failures": 0,
+        },
+        status=200,
+    )
+    wh_updated = client.update_webhook("wh-1", active=False)
+    assert wh_updated.active is False
+
+    # delete_webhook
+    responses.add(
+        responses.DELETE,
+        "https://mello.mezon.vn/api/v1/webhooks/wh-1",
+        status=204,
+    )
+    client.delete_webhook("wh-1")
+
+    # list_webhook_deliveries
+    responses.add(
+        responses.GET,
+        "https://mello.mezon.vn/api/v1/webhooks/wh-1/deliveries",
+        json=[
+            {
+                "id": "del-1",
+                "webhook_id": "wh-1",
+                "event_id": "ev-1",
+                "event_type": "ticket.created",
+                "status": "succeeded",
+                "attempts": 1,
+            }
+        ],
+        status=200,
+    )
+    deliveries = client.list_webhook_deliveries("wh-1")
+    assert len(deliveries) == 1
+    assert deliveries[0].id == "del-1"
+
+    # redeliver_webhook_event
+    responses.add(
+        responses.POST,
+        "https://mello.mezon.vn/api/v1/webhooks/wh-1/deliveries/del-1/redeliver",
+        status=202,
+    )
+    client.redeliver_webhook_event("wh-1", "del-1")
+
+
+@responses.activate
+def test_github_endpoints(client: MelloClient) -> None:
+    workspace_id = "ws-1"
+    board_id = "b-1"
+    ticket_id = "t-1"
+
+    # list_github_installations
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/github/installations",
+        json=[
+            {
+                "id": "ghi-1",
+                "workspace_id": workspace_id,
+                "owner_user_id": "u-1",
+                "installation_id": 12345,
+                "account_login": "org",
+                "account_type": "Organization",
+                "state": "active",
+            }
+        ],
+        status=200,
+    )
+    insts = client.list_github_installations(workspace_id)
+    assert len(insts) == 1
+    assert insts[0].installation_id == 12345
+
+    # list_github_repositories
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/github/repositories",
+        json=[
+            {
+                "installation_id": 12345,
+                "github_repo_id": 999,
+                "owner": "org",
+                "name": "repo",
+                "full_name": "org/repo",
+                "private": True,
+                "html_url": "https://github.com/org/repo",
+                "default_branch": "main",
+            }
+        ],
+        status=200,
+    )
+    repos = client.list_github_repositories(workspace_id)
+    assert len(repos) == 1
+    assert repos[0].full_name == "org/repo"
+
+    # list_github_board_repositories
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/boards/{board_id}/github/repositories",
+        json=[],
+        status=200,
+    )
+    board_repos = client.list_github_board_repositories(workspace_id, board_id)
+    assert board_repos == []
+
+    # replace_github_board_repositories
+    responses.add(
+        responses.PUT,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/boards/{board_id}/github/repositories",
+        match=[
+            responses.matchers.json_params_matcher(
+                {"repositories": [{"installation_id": 12345, "github_repo_id": 999}]}
+            )
+        ],
+        json=[
+            {
+                "installation_id": 12345,
+                "github_repo_id": 999,
+                "owner": "org",
+                "name": "repo",
+                "full_name": "org/repo",
+                "private": True,
+                "html_url": "https://github.com/org/repo",
+                "default_branch": "main",
+            }
+        ],
+        status=200,
+    )
+    rep_repos = client.replace_github_board_repositories(
+        workspace_id, board_id, [{"installation_id": 12345, "github_repo_id": 999}]
+    )
+    assert len(rep_repos) == 1
+
+    # start_github_connect
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/github/connect/start",
+        json={"setup_url": "https://github.com/apps/mello/installations/new", "state": "xyz"},
+        status=200,
+    )
+    conn = client.start_github_connect(workspace_id)
+    assert conn["setup_url"] == "https://github.com/apps/mello/installations/new"
+
+    # delete_github_installation
+    responses.add(
+        responses.DELETE,
+        f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/github/installations/ghi-1",
+        status=204,
+    )
+    client.delete_github_installation(workspace_id, "ghi-1")
+
+    # search_github_objects
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/github/search?q=fix&type=issue",
+        json=[
+            {
+                "installation_id": 12345,
+                "github_repo_id": 999,
+                "repository_full_name": "org/repo",
+                "object": {
+                    "kind": "issue",
+                    "number": 1,
+                    "title": "Fix bug",
+                    "state": "open",
+                    "status": "active",
+                    "html_url": "https://github.com/org/repo/issues/1",
+                },
+            }
+        ],
+        status=200,
+    )
+    search_res = client.search_github_objects(ticket_id, q="fix", type="issue")
+    assert len(search_res) == 1
+    assert search_res[0].object.title == "Fix bug"
+
+    # create_github_link
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/github/links",
+        match=[
+            responses.matchers.json_params_matcher(
+                {
+                    "installation_id": 12345,
+                    "github_repo_id": 999,
+                    "kind": "issue",
+                    "number": 1,
+                }
+            )
+        ],
+        json={
+            "id": "link-1",
+            "ticket_id": ticket_id,
+            "workspace_id": workspace_id,
+            "board_id": board_id,
+            "github_repo_id": 999,
+            "repository_full_name": "org/repo",
+            "repository_owner": "org",
+            "repository_name": "repo",
+            "repository_html_url": "https://github.com/org/repo",
+            "kind": "issue",
+            "external_key": "org/repo#1",
+            "number": 1,
+            "title": "Fix bug",
+            "state": "open",
+            "status": "active",
+            "html_url": "https://github.com/org/repo/issues/1",
+        },
+        status=201,
+    )
+    link = client.create_github_link(
+        ticket_id, installation_id=12345, github_repo_id=999, kind="issue", number=1
+    )
+    assert link.id == "link-1"
+
+    # delete_github_link
+    responses.add(
+        responses.DELETE,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/github/links/link-1",
+        status=204,
+    )
+    client.delete_github_link(ticket_id, "link-1")
