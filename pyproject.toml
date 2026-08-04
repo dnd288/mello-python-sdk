@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mello-sdk"
-version = "1.0.0"
+version = "1.1.0"
 description = "Typed Python SDK for the Mello Public REST API"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -33,6 +33,7 @@ dependencies = [
 ]
 
 [project.scripts]
+mello-cli = "mello.cli:main"
 mello-mcp-server = "mello.mcp_server:main"
 
 [project.urls]

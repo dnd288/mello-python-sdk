@@ -38,6 +38,61 @@ for workspace in client.list_workspaces():
         print(f"  Board: {board.name} ({board.code})")
 ```
 
+## CLI
+
+`mello-cli` is a JSON-first command-line interface for scripts and AI agents. It
+uses `MELLO_API_KEY` by default and emits exactly one JSON object on stdout.
+
+```bash
+export MELLO_API_KEY="mello_pat_..."
+
+mello-cli me get
+mello-cli workspace list
+mello-cli ticket search --workspace-id "workspace-uuid" --query "login crash"
+mello-cli ticket update --ticket-id "ticket-uuid" --set title="Fix login on iOS"
+mello-cli ticket update --ticket-id "ticket-uuid" --clear pic_user_id
+```
+
+Omitted update fields stay unchanged. `--clear field` (or `--set field=null`)
+clears nullable fields such as `pic_user_id`, `supervisor_id`, and dates.
+
+Destructive and high-impact operations require explicit confirmation. After
+confirming the target with the user, pass `--yes`:
+
+```bash
+mello-cli --yes ticket delete --ticket-id "ticket-uuid"
+mello-cli --yes github replace-board-repos \
+  --workspace-id "workspace-uuid" --board-id "board-uuid" \
+  --repositories '[{"installation_id": 1, "github_repo_id": 2}]'
+```
+
+Use `--token`, `--base-url`, and `--timeout` to override `MELLO_API_KEY`,
+`MELLO_BASE_URL`, and `MELLO_TIMEOUT`. Run `mello-cli --help` for the complete
+resource command surface.
+
+### Install the CLI globally
+
+Install `mello-cli` (and `mello-mcp-server`) globally as an isolated tool with
+[uv](https://docs.astral.sh/uv/):
+
+```bash
+# From PyPI
+uv tool install mello-sdk
+
+# Or directly from this repository (local development)
+uv tool install --from . mello-sdk
+```
+
+The executables land in `~/.local/bin` (make sure it is on your `PATH`).
+
+**Important:** when installed from a local source directory, the global tool
+does **not** track your changes. After updating the CLI code in this repo,
+reinstall to refresh the global executables:
+
+```bash
+uv tool install --from . mello-sdk --force
+```
+
 ## MCP Server
 
 The package can also run as a Model Context Protocol server for AI assistants
@@ -168,11 +223,17 @@ print(len(ticket_detail.comments))
 client.update_ticket(
     ticket.id,
     title="Fix login crash on iOS",
-    assignee_id="user-uuid",
+    pic_user_id="user-uuid",
 )
 
 # Nullable fields can be cleared explicitly with None.
-client.update_ticket(ticket.id, assignee_id=None, start_date=None, end_date=None)
+client.update_ticket(
+    ticket.id,
+    pic_user_id=None,
+    supervisor_id=None,
+    start_date=None,
+    end_date=None,
+)
 
 client.move_ticket(ticket.id, column_id="other-column-uuid", position=0)
 ```
