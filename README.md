@@ -93,6 +93,26 @@ reinstall to refresh the global executables:
 uv tool install --from . mello-sdk --force
 ```
 
+### Claude Code Skill
+
+The repository ships a [Claude Code](https://claude.com/claude-code) skill at
+[`skills/mello/`](skills/mello/) that teaches agents to operate Mello through
+`mello-cli` (JSON output, safe confirmation rules, update semantics).
+
+To use it, install the skill into your Claude Code configuration:
+
+```bash
+# Personal (available in every project)
+cp -r skills/mello ~/.claude/skills/mello
+
+# Or project-local (only inside a specific project)
+cp -r skills/mello /path/to/your-project/.claude/skills/mello
+```
+
+Then make sure `mello-cli` is installed globally (see above) and
+`MELLO_API_KEY` is set in your shell environment. Claude Code will trigger the
+`mello` skill automatically for Mello-related requests.
+
 ## MCP Server
 
 The package can also run as a Model Context Protocol server for AI assistants
