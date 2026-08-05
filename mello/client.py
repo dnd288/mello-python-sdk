@@ -24,6 +24,7 @@ from mello.models import (
     GithubRepository,
     GithubSearchObjectResult,
     GithubLink,
+    Label,
 )
 
 
@@ -324,6 +325,72 @@ class MelloClient:
 
         data = self._request("PATCH", f"/columns/{column_id}", json_data=payload)
         return Column.from_dict(data)
+
+    # --- Labels Tag ---
+
+    def list_labels(self, board_id: str) -> List[Label]:
+        """
+        List labels on a board.
+
+        Args:
+            board_id: The ID of the board.
+
+        Returns:
+            List[Label]: List of labels.
+        """
+        data = self._request("GET", f"/boards/{board_id}/labels", use_v1=False)
+        return [Label.from_dict(lbl) for lbl in (data or [])]
+
+    def create_label(
+        self, board_id: str, name: str, color: Optional[str] = None
+    ) -> Label:
+        """
+        Create a label on a board.
+
+        Args:
+            board_id: The ID of the board.
+            name: Name of the label.
+            color: Optional label color hex value.
+
+        Returns:
+            Label: The created label.
+        """
+        payload: Dict[str, Any] = {"name": name}
+        if color is not None:
+            payload["color"] = color
+
+        data = self._request(
+            "POST", f"/boards/{board_id}/labels", json_data=payload, use_v1=False
+        )
+        return Label.from_dict(data)
+
+    def update_label(
+        self,
+        label_id: str,
+        name: Union[str, UnsetType] = UNSET,
+        color: Union[str, UnsetType] = UNSET,
+    ) -> Label:
+        """
+        Update a label.
+
+        Args:
+            label_id: The ID of the label.
+            name: Optional new label name.
+            color: Optional new label color hex value.
+
+        Returns:
+            Label: The updated label.
+        """
+        payload: Dict[str, Any] = {}
+        if not isinstance(name, UnsetType):
+            payload["name"] = name
+        if not isinstance(color, UnsetType):
+            payload["color"] = color
+
+        data = self._request(
+            "PATCH", f"/labels/{label_id}", json_data=payload, use_v1=False
+        )
+        return Label.from_dict(data)
 
     # --- Tickets Tag ---
 

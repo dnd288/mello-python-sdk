@@ -193,6 +193,20 @@ class FakeClient:
         self.calls.append(("create_checklist", ticket_id, title, position))
         return {"ticket_id": ticket_id, "title": title, "id": "chk-1"}
 
+    def list_labels(self, board_id: str) -> List[Dict[str, str]]:
+        self.calls.append(("list_labels", board_id))
+        return [{"board_id": board_id, "id": "lbl-1"}]
+
+    def create_label(
+        self, board_id: str, name: str, color: Optional[str] = None
+    ) -> Dict[str, Any]:
+        self.calls.append(("create_label", board_id, name, color))
+        return {"board_id": board_id, "name": name, "color": color, "id": "lbl-1"}
+
+    def update_label(self, label_id: str, **kwargs: Any) -> Dict[str, Any]:
+        self.calls.append(("update_label", label_id, kwargs))
+        return {"id": label_id, **kwargs}
+
     def update_checklist(self, checklist_id: str, **kwargs: Any) -> Dict[str, Any]:
         self.calls.append(("update_checklist", checklist_id, kwargs))
         return {"id": checklist_id, **kwargs}
@@ -251,6 +265,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "create_column",
         "create_comment",
         "create_github_link",
+        "create_label",
         "create_ticket",
         "create_webhook",
         "delete_board",
@@ -270,6 +285,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "list_github_installations",
         "list_github_repositories",
         "list_history",
+        "list_labels",
         "list_webhook_deliveries",
         "list_webhooks",
         "list_workspace_boards",
@@ -286,6 +302,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "update_checklist",
         "update_checklist_item",
         "update_column",
+        "update_label",
         "update_ticket",
         "update_webhook",
     ]
@@ -321,6 +338,26 @@ def test_registered_tools_delegate_to_client_and_serialize_results() -> None:
         checklist_item_id="chki-1", updates={"is_checked": True}
     ) == {"id": "chki-1", "is_checked": True}
     assert client.calls[-1] == ("update_checklist_item", "chki-1", {"is_checked": True})
+
+    # Label tests
+    assert server.tools["list_labels"](board_id="board-1") == [
+        {"board_id": "board-1", "id": "lbl-1"}
+    ]
+    assert client.calls[-1] == ("list_labels", "board-1")
+
+    assert server.tools["create_label"](
+        board_id="board-1", name="Auth", color="#c8f1df"
+    ) == {"board_id": "board-1", "name": "Auth", "color": "#c8f1df", "id": "lbl-1"}
+    assert client.calls[-1] == ("create_label", "board-1", "Auth", "#c8f1df")
+
+    assert server.tools["update_label"](
+        label_id="lbl-1", updates={"name": "Auth 1", "color": "#ffa500"}
+    ) == {"id": "lbl-1", "name": "Auth 1", "color": "#ffa500"}
+    assert client.calls[-1] == (
+        "update_label",
+        "lbl-1",
+        {"name": "Auth 1", "color": "#ffa500"},
+    )
 
     # Attachment tests
     import base64

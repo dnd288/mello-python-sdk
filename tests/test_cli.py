@@ -27,6 +27,24 @@ class FakeClient:
     def delete_ticket(self, ticket_id: str) -> None:
         self.calls.append(("delete_ticket", (ticket_id,), {}))
 
+    def list_labels(self, board_id: str) -> List[Dict[str, str]]:
+        self.calls.append(("list_labels", (board_id,), {}))
+        return [{"id": "label-1", "board_id": board_id}]
+
+    def create_label(
+        self, board_id: str, name: str, color: Any = None
+    ) -> Dict[str, Any]:
+        self.calls.append(("create_label", (board_id, name, color), {}))
+        return {
+            "method": "create_label",
+            "args": [board_id, name, color],
+            "kwargs": {},
+        }
+
+    def update_label(self, label_id: str, **kwargs: Any) -> Dict[str, Any]:
+        self.calls.append(("update_label", (label_id,), kwargs))
+        return {"method": "update_label", "args": [label_id], "kwargs": kwargs}
+
     def update_ticket(self, ticket_id: str, **kwargs: Any) -> Dict[str, Any]:
         return self._call("update_ticket", ticket_id, **kwargs)
 
@@ -196,6 +214,91 @@ def test_confirmed_delete_calls_client(
     assert output(capsys) == {"ok": True, "data": None}
     assert clients["client"].calls == [("delete_ticket", ("ticket-1",), {})]
 
+
+def test_label_list_and_create(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(["label", "list", "--board-id", "board-1"], make_factory(clients)) == 0
+    )
+    payload = output(capsys)
+    assert payload == {
+        "ok": True,
+        "data": [{"id": "label-1", "board_id": "board-1"}],
+        "count": 1,
+    }
+
+    assert (
+        main(
+            [
+                "label",
+                "create",
+                "--board-id",
+                "board-1",
+                "--name",
+                "Auth",
+                "--color",
+                "#c8f1df",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    payload = output(capsys)
+    assert payload["ok"] is True
+    assert payload["data"]["args"] == ["board-1", "Auth", "#c8f1df"]
+
+def test_label_update(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "label",
+                "update",
+                "--label-id",
+                "label-1",
+                "--set",
+                "name=Auth 1",
+                "--set",
+                "color=#ffa500",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    payload = output(capsys)
+    assert payload["data"]["kwargs"] == {"name": "Auth 1", "color": "#ffa500"}
+
+def test_label_update_rejects_unknown_field(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+
+    assert (
+        main(
+            [
+                "label",
+                "update",
+                "--label-id",
+                "label-1",
+                "--set",
+                "position=1",
+            ],
+            make_factory({}),
+        )
+        == 2
+    )
+
+    error = json.loads(capsys.readouterr().err)
+    assert error["error"]["type"] == "usage"
+    assert "position" in error["error"]["message"]
 
 def test_attachment_upload_and_download(
     monkeypatch: pytest.MonkeyPatch,
