@@ -83,7 +83,13 @@ def create_mcp_server(
         client_factory = _client_from_env
 
     if server_cls is None:
-        from mcp.server.fastmcp import FastMCP
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError:
+            try:
+                from mcp.server.mcpserver import FastMCP
+            except ImportError:
+                from mcp.server.mcpserver import MCPServer as FastMCP
 
         server_cls = FastMCP
 
@@ -410,7 +416,6 @@ def create_mcp_server(
         client().delete_github_link(ticket_id, link_id)
         return None
 
-    @server.tool()
     @server.tool()
     def create_attachment(
         ticket_id: str,
