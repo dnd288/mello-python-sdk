@@ -78,6 +78,25 @@ mello-cli ticket update --ticket-id "ticket-uuid" --clear pic_user_id
 mello-cli ticket update --ticket-id "ticket-uuid" --set start_date=2026-08-04T09:00:00Z
 ```
 
+## Description and Comment Format
+
+Mello currently renders ticket descriptions and comments as **HTML only**. Plain
+text or Markdown will display raw instead of formatted.
+
+- For tickets, prefer `--set description_html='<p>...</p>'` (or
+  `--description` when creating a ticket) and send HTML markup.
+- For comments, use `--body-html '<p>...</p>'` alongside `--body` so the
+  rendered version is HTML.
+- Wrap content in at least paragraph tags; convert Markdown to HTML before
+  sending instead of passing Markdown through.
+
+Examples:
+
+```bash
+mello-cli ticket update --ticket-id "ticket-uuid" --set description_html='<p>Fix the <strong>login</strong> flow on iOS.</p>'
+mello-cli comment create --ticket-id "ticket-uuid" --body "Fix verified on staging" --body-html '<p>Fix verified on <em>staging</em>.</p>'
+```
+
 ## Attachments
 
 Use a path for uploads. For downloads, use `--output PATH` to write bytes to a

@@ -292,6 +292,80 @@ def test_list_columns(client: MelloClient) -> None:
 
 
 @responses.activate
+def test_list_labels(client: MelloClient) -> None:
+    board_id = "11111111-2222-3333-4444-555555555555"
+    labels_payload = [
+        {
+            "id": "1abe11ab-e11b-e11b-e11b-e11be11be11b",
+            "board_id": board_id,
+            "name": "Auth",
+            "color": "#c8f1df",
+        }
+    ]
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/boards/{board_id}/labels",
+        json=labels_payload,
+        status=200,
+    )
+
+    labels = client.list_labels(board_id)
+    assert len(labels) == 1
+    assert labels[0].name == "Auth"
+    assert labels[0].color == "#c8f1df"
+    assert labels[0].board_id == board_id
+
+@responses.activate
+def test_create_label(client: MelloClient) -> None:
+    board_id = "11111111-2222-3333-4444-555555555555"
+    label_payload = {
+        "id": "1abe11ab-e11b-e11b-e11b-e11be11be11b",
+        "board_id": board_id,
+        "name": "Auth",
+        "color": "#c8f1df",
+    }
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/boards/{board_id}/labels",
+        match=[
+            responses.matchers.json_params_matcher(
+                {"name": "Auth", "color": "#c8f1df"}
+            )
+        ],
+        json=label_payload,
+        status=201,
+    )
+
+    label = client.create_label(board_id, name="Auth", color="#c8f1df")
+    assert label.name == "Auth"
+    assert label.color == "#c8f1df"
+
+@responses.activate
+def test_update_label(client: MelloClient) -> None:
+    label_id = "1abe11ab-e11b-e11b-e11b-e11be11be11b"
+    label_payload = {
+        "id": label_id,
+        "board_id": "11111111-2222-3333-4444-555555555555",
+        "name": "Auth 1",
+        "color": "#ffa500",
+    }
+    responses.add(
+        responses.PATCH,
+        f"https://mello.mezon.vn/api/labels/{label_id}",
+        match=[
+            responses.matchers.json_params_matcher(
+                {"name": "Auth 1", "color": "#ffa500"}
+            )
+        ],
+        json=label_payload,
+        status=200,
+    )
+
+    label = client.update_label(label_id, name="Auth 1", color="#ffa500")
+    assert label.name == "Auth 1"
+    assert label.color == "#ffa500"
+
+@responses.activate
 def test_create_column(client: MelloClient) -> None:
     board_id = "11111111-2222-3333-4444-555555555555"
     column_payload = {

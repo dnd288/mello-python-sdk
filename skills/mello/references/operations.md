@@ -17,6 +17,9 @@ from a prior read/search response rather than guessing.
 | Create column | `mello-cli column create --board-id ID --name NAME [--position N]` | |
 | Update column | `mello-cli column update --column-id ID --set color=#ffcc00` | Fields: `name`, `position`, `color` |
 | Reorder columns | `mello-cli column reorder --board-id ID --column-ids ID1,ID2` | Ordered IDs |
+| List labels | `mello-cli label list --board-id ID` | Read-only |
+| Create label | `mello-cli label create --board-id ID --name NAME [--color #RRGGBB]` | |
+| Update label | `mello-cli label update --label-id ID --set name=NAME` | Fields: `name`, `color` |
 | List tickets | `mello-cli ticket list --board-id ID` | Read-only |
 | Get ticket | `mello-cli ticket get --ticket-id ID` | Detail includes comments/checklists/activity |
 | Create ticket | `mello-cli ticket create --column-id ID --title TITLE [--description TEXT] [--position N]` | |

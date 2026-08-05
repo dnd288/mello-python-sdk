@@ -159,6 +159,22 @@ def create_mcp_server(
         return _serialize(client().update_column(column_id, **kwargs))
 
     @server.tool()
+    def list_labels(board_id: str) -> Any:
+        """List labels on a Mello board."""
+        return _serialize(client().list_labels(board_id))
+
+    @server.tool()
+    def create_label(board_id: str, name: str, color: Optional[str] = None) -> Any:
+        """Create a label on a Mello board."""
+        return _serialize(client().create_label(board_id, name, color))
+
+    @server.tool()
+    def update_label(label_id: str, updates: Optional[Dict[str, Any]] = None) -> Any:
+        """Update label fields: name, color."""
+        kwargs = _present_update_kwargs(updates, ["name", "color"])
+        return _serialize(client().update_label(label_id, **kwargs))
+
+    @server.tool()
     def list_board_tickets(board_id: str) -> Any:
         """List tickets on a Mello board."""
         return _serialize(client().list_board_tickets(board_id))

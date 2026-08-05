@@ -38,6 +38,7 @@ UPDATE_FIELDS = {
         "end_date",
     },
     "checklist": {"title", "position"},
+    "label": {"name", "color"},
     "checklist_item": {"title", "is_checked", "position"},
     "webhook": {"active", "events", "description", "callback_url"},
 }
@@ -177,6 +178,19 @@ def build_parser() -> argparse.ArgumentParser:
     _required(p, "--board-id", "--column-ids")
     p.set_defaults(func=_cmd_column_reorder)
 
+    label = _subparser(groups, "label", "Label operations")
+    l_sub = label.add_subparsers(dest="verb", required=True)
+    p = _subparser(l_sub, "list", "List board labels")
+    _required(p, "--board-id")
+    p.set_defaults(func=_cmd_label_list)
+    p = _subparser(l_sub, "create", "Create a label")
+    _required(p, "--board-id", "--name")
+    p.add_argument("--color")
+    p.set_defaults(func=_cmd_label_create)
+    p = _subparser(l_sub, "update", "Update a label")
+    _required(p, "--label-id")
+    _updates(p)
+    p.set_defaults(func=_cmd_label_update)
     ticket = _subparser(groups, "ticket", "Ticket operations")
     t_sub = ticket.add_subparsers(dest="verb", required=True)
     p = _subparser(t_sub, "list", "List board tickets")
@@ -533,6 +547,18 @@ def _cmd_column_reorder(client: MelloClient, args: argparse.Namespace) -> Any:
     if not column_ids:
         raise CLIError("--column-ids must contain at least one ID")
     return client.reorder_columns(args.board_id, column_ids)
+
+
+def _cmd_label_list(client: MelloClient, args: argparse.Namespace) -> Any:
+    return client.list_labels(args.board_id)
+
+
+def _cmd_label_create(client: MelloClient, args: argparse.Namespace) -> Any:
+    return client.create_label(args.board_id, args.name, args.color)
+
+
+def _cmd_label_update(client: MelloClient, args: argparse.Namespace) -> Any:
+    return client.update_label(args.label_id, **_parse_updates(args, "label"))
 
 
 def _cmd_ticket_list(client: MelloClient, args: argparse.Namespace) -> Any:

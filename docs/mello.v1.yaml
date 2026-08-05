@@ -16,6 +16,7 @@ tags:
   - name: Workspaces
   - name: Boards
   - name: Columns
+  - name: Labels
   - name: Tickets
   - name: Checklists
   - name: Comments
@@ -209,6 +210,61 @@ paths:
       responses:
         '204':
           description: Reordered.
+  /boards/{boardID}/labels:
+    get:
+      tags: [ Labels ]
+      summary: List board labels.
+      operationId: listLabels
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      responses:
+        '200':
+          description: Labels.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Label'
+    post:
+      tags: [ Labels ]
+      summary: Create a label.
+      operationId: createLabel
+      parameters:
+        - $ref: '#/components/parameters/BoardID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLabelRequest'
+      responses:
+        '201':
+          description: Created label.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
+  /labels/{labelID}:
+    patch:
+      tags: [ Labels ]
+      summary: Update a label.
+      operationId: updateLabel
+      parameters:
+        - $ref: '#/components/parameters/LabelID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLabelRequest'
+      responses:
+        '200':
+          description: Updated label.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Label'
   /boards/{boardID}/tickets:
     get:
       tags: [ Tickets ]
@@ -940,6 +996,13 @@ components:
       schema:
         type: string
         format: uuid
+    LabelID:
+      name: labelID
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     TicketID:
       name: ticketID
       in: path
@@ -1412,6 +1475,21 @@ components:
           type: string
         position:
           type: integer
+        color:
+          type: string
+    CreateLabelRequest:
+      type: object
+      required: [ name ]
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+    UpdateLabelRequest:
+      type: object
+      properties:
+        name:
+          type: string
         color:
           type: string
     CreateTicketRequest:
