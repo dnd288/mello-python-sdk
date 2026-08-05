@@ -209,11 +209,9 @@ def create_mcp_server(
         return _serialize(client().update_ticket(ticket_id, **kwargs))
 
     @server.tool()
-    def move_ticket(
-        ticket_id: str, column_id: str, position: Optional[int] = None
-    ) -> Any:
-        """Move a Mello ticket to another column (and optional position)."""
-        return _serialize(client().move_ticket(ticket_id, column_id, position))
+    def move_ticket(ticket_id: str, column_id: str) -> Any:
+        """Move a Mello ticket to another column."""
+        return _serialize(client().move_ticket(ticket_id, column_id))
 
     @server.tool()
     def list_comments(ticket_id: str) -> Any:
