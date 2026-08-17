@@ -164,7 +164,7 @@ class FakeClient:
         return {"id": ticket_id, **kwargs}
 
     def move_ticket(
-        self, ticket_id: str, column_id: str, position: int
+        self, ticket_id: str, column_id: str, position: Optional[int] = None
     ) -> Dict[str, Any]:
         self.calls.append(("move_ticket", ticket_id, column_id, position))
         return {"ticket_id": ticket_id, "column_id": column_id, "position": position}

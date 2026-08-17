@@ -663,14 +663,14 @@ def test_move_ticket(client: MelloClient) -> None:
         f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/move",
         match=[
             responses.matchers.json_params_matcher(
-                {"column_id": column_id, "position": 5}
+                {"column_id": column_id}
             )
         ],
         json=move_payload,
         status=200,
     )
 
-    result = client.move_ticket(ticket_id, column_id=column_id, position=5)
+    result = client.move_ticket(ticket_id, column_id=column_id)
     assert result.workspace_id == "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"
     assert result.from_column == "c1c1c1c1-c2c2-c3c3-c4c4-c5c5c5c5c5c5"
     assert result.to_column == column_id

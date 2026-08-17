@@ -495,23 +495,23 @@ class MelloClient:
         return Ticket.from_dict(data)
 
     def move_ticket(
-        self, ticket_id: str, column_id: str, position: int
+        self,
+        ticket_id: str,
+        column_id: str,
+        position: Optional[int] = None,
     ) -> MoveTicketResult:
         """
-        Move a ticket atomically.
+        Move a ticket atomically to another column.
 
         Args:
             ticket_id: The ID of the ticket.
             column_id: Target column ID.
-            position: Position in the target column.
+            position: Unused (retained for backward compatibility).
 
         Returns:
             MoveTicketResult: Result of the ticket movement.
         """
-        payload = {
-            "column_id": column_id,
-            "position": position,
-        }
+        payload = {"column_id": column_id}
         data = self._request("PATCH", f"/tickets/{ticket_id}/move", json_data=payload)
         return MoveTicketResult.from_dict(data)
 
