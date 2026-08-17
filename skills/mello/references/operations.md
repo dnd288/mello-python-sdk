@@ -20,15 +20,18 @@ from a prior read/search response rather than guessing.
 | List labels | `mello-cli label list --board-id ID` | Read-only |
 | Create label | `mello-cli label create --board-id ID --name NAME [--color #RRGGBB]` | |
 | Update label | `mello-cli label update --label-id ID --set name=NAME` | Fields: `name`, `color` |
+| Delete label | `mello-cli --yes label delete --label-id ID` | **confirm** |
 | List tickets | `mello-cli ticket list --board-id ID` | Read-only |
 | Get ticket | `mello-cli ticket get --ticket-id ID` | Detail includes comments/checklists/activity |
-| Create ticket | `mello-cli ticket create --column-id ID --title TITLE [--description TEXT] [--position N]` | |
-| Update ticket | `mello-cli ticket update --ticket-id ID --set title=TITLE` | Fields: `title`, `description`, `description_html`, `pic_user_id`, `supervisor_id`, `start_date`, `end_date` |
+| Create ticket | `mello-cli ticket create --column-id ID --title TITLE [--description TEXT] [--description-markdown MD] [--description-html HTML] [--position N]` | `description_markdown` renders server-side |
+| Update ticket | `mello-cli ticket update --ticket-id ID --set title=TITLE` | Fields: `title`, `description`, `description_markdown`, `description_html`, `pic_user_id`, `supervisor_id`, `start_date`, `end_date` |
 | Move ticket | `mello-cli ticket move --ticket-id ID --column-id ID --position N` | Atomic move |
 | Delete ticket | `mello-cli --yes ticket delete --ticket-id ID` | **confirm**; CLI/SDK-only (not an MCP tool) |
+| Attach label | `mello-cli ticket attach-label --ticket-id ID --label-id ID` | |
+| Detach label | `mello-cli --yes ticket detach-label --ticket-id ID --label-id ID` | **confirm** |
 | Search tickets | `mello-cli ticket search --workspace-id ID --query TEXT` | Read-only |
 | List comments | `mello-cli comment list --ticket-id ID` | Read-only |
-| Create comment | `mello-cli comment create --ticket-id ID --body TEXT [--body-html HTML]` | |
+| Create comment | `mello-cli comment create --ticket-id ID --body TEXT [--body-markdown MD] [--body-html HTML]` | `body_markdown` renders server-side |
 | Ticket history | `mello-cli history list --ticket-id ID` | Read-only |
 | Create checklist | `mello-cli checklist create --ticket-id ID --title TITLE [--position N]` | |
 | Update checklist | `mello-cli checklist update --checklist-id ID --set title=TITLE` | Fields: `title`, `position` |
@@ -44,6 +47,7 @@ from a prior read/search response rather than guessing.
 | Delete webhook | `mello-cli --yes webhook delete --webhook-id ID` | **confirm** |
 | Delivery history | `mello-cli webhook deliveries --webhook-id ID` | Read-only |
 | Redeliver event | `mello-cli --yes webhook redeliver --webhook-id ID --delivery-id ID` | **confirm** |
+| Verify webhook | `mello-cli webhook verify --payload BODY --signature SIG --timestamp TS --secret SECRET` | Verifies HMAC-SHA256 signature |
 | GitHub installations | `mello-cli github installations --workspace-id ID` | Read-only |
 | GitHub repositories | `mello-cli github repos --workspace-id ID` | Read-only |
 | Board GitHub repos | `mello-cli github board-repos --workspace-id ID --board-id ID` | Read-only |

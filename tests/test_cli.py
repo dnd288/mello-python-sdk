@@ -27,6 +27,23 @@ class FakeClient:
     def delete_ticket(self, ticket_id: str) -> None:
         self.calls.append(("delete_ticket", (ticket_id,), {}))
 
+    def create_ticket(
+        self,
+        column_id: str,
+        title: str,
+        description: Any = None,
+        position: Any = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        return self._call(
+            "create_ticket",
+            column_id,
+            title,
+            description=description,
+            position=position,
+            **kwargs,
+        )
+
     def list_labels(self, board_id: str) -> List[Dict[str, str]]:
         self.calls.append(("list_labels", (board_id,), {}))
         return [{"id": "label-1", "board_id": board_id}]
@@ -44,6 +61,20 @@ class FakeClient:
     def update_label(self, label_id: str, **kwargs: Any) -> Dict[str, Any]:
         self.calls.append(("update_label", (label_id,), kwargs))
         return {"method": "update_label", "args": [label_id], "kwargs": kwargs}
+
+    def delete_label(self, label_id: str) -> None:
+        self.calls.append(("delete_label", (label_id,), {}))
+
+    def attach_label_to_ticket(self, ticket_id: str, label_id: str) -> None:
+        self.calls.append(("attach_label_to_ticket", (ticket_id, label_id), {}))
+
+    def detach_label_from_ticket(self, ticket_id: str, label_id: str) -> None:
+        self.calls.append(("detach_label_from_ticket", (ticket_id, label_id), {}))
+
+    def create_comment(
+        self, ticket_id: str, body: str, **kwargs: Any
+    ) -> Dict[str, Any]:
+        return self._call("create_comment", ticket_id, body, **kwargs)
 
     def update_ticket(self, ticket_id: str, **kwargs: Any) -> Dict[str, Any]:
         return self._call("update_ticket", ticket_id, **kwargs)
@@ -221,9 +252,7 @@ def test_label_list_and_create(
     monkeypatch.setenv("MELLO_API_KEY", "token")
     clients: Dict[str, FakeClient] = {}
 
-    assert (
-        main(["label", "list", "--board-id", "board-1"], make_factory(clients)) == 0
-    )
+    assert main(["label", "list", "--board-id", "board-1"], make_factory(clients)) == 0
     payload = output(capsys)
     assert payload == {
         "ok": True,
@@ -251,6 +280,7 @@ def test_label_list_and_create(
     assert payload["ok"] is True
     assert payload["data"]["args"] == ["board-1", "Auth", "#c8f1df"]
 
+
 def test_label_update(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -276,6 +306,7 @@ def test_label_update(
     payload = output(capsys)
     assert payload["data"]["kwargs"] == {"name": "Auth 1", "color": "#ffa500"}
 
+
 def test_label_update_rejects_unknown_field(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -299,6 +330,7 @@ def test_label_update_rejects_unknown_field(
     error = json.loads(capsys.readouterr().err)
     assert error["error"]["type"] == "usage"
     assert "position" in error["error"]["message"]
+
 
 def test_attachment_upload_and_download(
     monkeypatch: pytest.MonkeyPatch,
@@ -355,3 +387,163 @@ def test_not_found_exception_uses_stable_error_type(
         "code": "not_found",
         "status_code": 404,
     }
+
+
+def test_label_delete_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            ["--yes", "label", "delete", "--label-id", "label-1"],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    assert clients["client"].calls[-1] == ("delete_label", ("label-1",), {})
+
+
+def test_ticket_attach_and_detach_label_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "ticket",
+                "attach-label",
+                "--ticket-id",
+                "ticket-1",
+                "--label-id",
+                "label-1",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    assert clients["client"].calls[-1] == (
+        "attach_label_to_ticket",
+        ("ticket-1", "label-1"),
+        {},
+    )
+
+    assert (
+        main(
+            [
+                "--yes",
+                "ticket",
+                "detach-label",
+                "--ticket-id",
+                "ticket-1",
+                "--label-id",
+                "label-1",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    assert clients["client"].calls[-1] == (
+        "detach_label_from_ticket",
+        ("ticket-1", "label-1"),
+        {},
+    )
+
+
+def test_ticket_create_with_markdown_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "ticket",
+                "create",
+                "--column-id",
+                "col-1",
+                "--title",
+                "Task",
+                "--description-markdown",
+                "## MD",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    _method, args, kwargs = clients["client"].calls[-1]
+    assert args == ("col-1", "Task")
+    assert kwargs["description_markdown"] == "## MD"
+
+
+def test_comment_create_with_markdown_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "comment",
+                "create",
+                "--ticket-id",
+                "ticket-1",
+                "--body",
+                "raw",
+                "--body-markdown",
+                "**raw**",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    _method, args, kwargs = clients["client"].calls[-1]
+    assert args == ("ticket-1", "raw")
+    assert kwargs["body_markdown"] == "**raw**"
+
+
+def test_webhook_verify_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import hashlib
+    import hmac
+
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    secret = "secret"
+    payload = '{"event":"ticket.created"}'
+    ts = datetime.now(timezone.utc).isoformat()
+    signed = f"{ts}.{payload}".encode("utf-8")
+    sig = (
+        f"sha256={hmac.new(secret.encode('utf-8'), signed, hashlib.sha256).hexdigest()}"
+    )
+
+    assert (
+        main(
+            [
+                "webhook",
+                "verify",
+                "--payload",
+                payload,
+                "--signature",
+                sig,
+                "--timestamp",
+                ts,
+                "--secret",
+                secret,
+            ],
+            make_factory({}),
+        )
+        == 0
+    )
+    res = output(capsys)
+    assert res["data"]["valid"] is True

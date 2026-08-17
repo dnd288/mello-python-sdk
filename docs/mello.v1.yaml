@@ -265,6 +265,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Label'
+    delete:
+      tags: [ Labels ]
+      summary: Delete a label.
+      operationId: deleteLabel
+      parameters:
+        - $ref: '#/components/parameters/LabelID'
+      responses:
+        '204':
+          description: Deleted.
   /boards/{boardID}/tickets:
     get:
       tags: [ Tickets ]
@@ -374,6 +383,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MoveTicketResult'
+  /tickets/{ticketID}/labels/{labelID}:
+    post:
+      tags: [ Tickets ]
+      summary: Attach a label to a ticket.
+      operationId: attachLabelToTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+        - $ref: '#/components/parameters/LabelID'
+      responses:
+        '204':
+          description: Attached.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [ Tickets ]
+      summary: Detach a label from a ticket.
+      operationId: detachLabelFromTicket
+      parameters:
+        - $ref: '#/components/parameters/TicketID'
+        - $ref: '#/components/parameters/LabelID'
+      responses:
+        '204':
+          description: Detached.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /tickets/{ticketID}/checklists:
     post:
       tags: [Checklists]
@@ -1500,6 +1542,10 @@ components:
           type: string
         description:
           type: string
+        description_markdown:
+          type: string
+        description_html:
+          type: string
         position:
           type: integer
     UpdateTicketRequest:
@@ -1508,6 +1554,8 @@ components:
         title:
           type: string
         description:
+          type: string
+        description_markdown:
           type: string
         description_html:
           type: string
@@ -1599,6 +1647,8 @@ components:
       required: [ body ]
       properties:
         body:
+          type: string
+        body_markdown:
           type: string
         body_html:
           type: string

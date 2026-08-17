@@ -1,4 +1,4 @@
-from mello.client import MelloClient, UNSET, UnsetType
+from mello.client import MelloClient, UNSET, UnsetType, verify_webhook_signature
 from mello.exceptions import (
     MelloException,
     MelloAPIException,
@@ -38,6 +38,7 @@ __all__ = [
     "MelloClient",
     "UNSET",
     "UnsetType",
+    "verify_webhook_signature",
     "MelloException",
     "MelloAPIException",
     "UnauthorizedException",

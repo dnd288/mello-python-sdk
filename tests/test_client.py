@@ -11,6 +11,7 @@ from mello import (
     ValidationErrorException,
     RateLimitedException,
     MelloAPIException,
+    verify_webhook_signature,
 )
 
 
@@ -304,7 +305,7 @@ def test_list_labels(client: MelloClient) -> None:
     ]
     responses.add(
         responses.GET,
-        f"https://mello.mezon.vn/api/boards/{board_id}/labels",
+        f"https://mello.mezon.vn/api/v1/boards/{board_id}/labels",
         json=labels_payload,
         status=200,
     )
@@ -314,6 +315,7 @@ def test_list_labels(client: MelloClient) -> None:
     assert labels[0].name == "Auth"
     assert labels[0].color == "#c8f1df"
     assert labels[0].board_id == board_id
+
 
 @responses.activate
 def test_create_label(client: MelloClient) -> None:
@@ -326,11 +328,9 @@ def test_create_label(client: MelloClient) -> None:
     }
     responses.add(
         responses.POST,
-        f"https://mello.mezon.vn/api/boards/{board_id}/labels",
+        f"https://mello.mezon.vn/api/v1/boards/{board_id}/labels",
         match=[
-            responses.matchers.json_params_matcher(
-                {"name": "Auth", "color": "#c8f1df"}
-            )
+            responses.matchers.json_params_matcher({"name": "Auth", "color": "#c8f1df"})
         ],
         json=label_payload,
         status=201,
@@ -339,6 +339,7 @@ def test_create_label(client: MelloClient) -> None:
     label = client.create_label(board_id, name="Auth", color="#c8f1df")
     assert label.name == "Auth"
     assert label.color == "#c8f1df"
+
 
 @responses.activate
 def test_update_label(client: MelloClient) -> None:
@@ -351,7 +352,7 @@ def test_update_label(client: MelloClient) -> None:
     }
     responses.add(
         responses.PATCH,
-        f"https://mello.mezon.vn/api/labels/{label_id}",
+        f"https://mello.mezon.vn/api/v1/labels/{label_id}",
         match=[
             responses.matchers.json_params_matcher(
                 {"name": "Auth 1", "color": "#ffa500"}
@@ -364,6 +365,38 @@ def test_update_label(client: MelloClient) -> None:
     label = client.update_label(label_id, name="Auth 1", color="#ffa500")
     assert label.name == "Auth 1"
     assert label.color == "#ffa500"
+
+
+@responses.activate
+def test_delete_label(client: MelloClient) -> None:
+    label_id = "1abe11ab-e11b-e11b-e11b-e11be11be11b"
+    responses.add(
+        responses.DELETE,
+        f"https://mello.mezon.vn/api/v1/labels/{label_id}",
+        status=204,
+    )
+    client.delete_label(label_id)
+
+
+@responses.activate
+def test_attach_and_detach_label_to_ticket(client: MelloClient) -> None:
+    ticket_id = "t1t1t1t1-t2t2-t3t3-t4t4-t5t5t5t5t5t5"
+    label_id = "1abe11ab-e11b-e11b-e11b-e11be11be11b"
+
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/labels/{label_id}",
+        status=204,
+    )
+    client.attach_label_to_ticket(ticket_id, label_id)
+
+    responses.add(
+        responses.DELETE,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/labels/{label_id}",
+        status=204,
+    )
+    client.detach_label_from_ticket(ticket_id, label_id)
+
 
 @responses.activate
 def test_create_column(client: MelloClient) -> None:
@@ -916,7 +949,7 @@ def test_create_attachment(client: MelloClient) -> None:
     ticket_id = "ticket-123"
     responses.add(
         responses.POST,
-        f"https://mello.mezon.vn/api/tickets/{ticket_id}/attachments",
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/attachments",
         json={
             "id": "att-1",
             "ticket_id": ticket_id,
@@ -941,7 +974,7 @@ def test_download_attachment(client: MelloClient) -> None:
     attachment_id = "att-1"
     responses.add(
         responses.GET,
-        f"https://mello.mezon.vn/api/attachments/{attachment_id}/download",
+        f"https://mello.mezon.vn/api/v1/attachments/{attachment_id}/download",
         body=b"filebytesdata",
         status=200,
     )
@@ -1160,7 +1193,10 @@ def test_github_endpoints(client: MelloClient) -> None:
     responses.add(
         responses.POST,
         f"https://mello.mezon.vn/api/v1/workspaces/{workspace_id}/github/connect/start",
-        json={"setup_url": "https://github.com/apps/mello/installations/new", "state": "xyz"},
+        json={
+            "setup_url": "https://github.com/apps/mello/installations/new",
+            "state": "xyz",
+        },
         status=200,
     )
     conn = client.start_github_connect(workspace_id)
@@ -1245,3 +1281,207 @@ def test_github_endpoints(client: MelloClient) -> None:
         status=204,
     )
     client.delete_github_link(ticket_id, "link-1")
+
+
+@responses.activate
+def test_create_ticket_with_markdown_and_html(client: MelloClient) -> None:
+    column_id = "c1c1c1c1-c2c2-c3c3-c4c4-c5c5c5c5c5c5"
+    ticket_payload = {
+        "id": "t1t1t1t1-t2t2-t3t3-t4t4-t5t5t5t5t5t5",
+        "ticket_number": 103,
+        "ticket_code": "PROJ-103",
+        "column_id": column_id,
+        "title": "Markdown Ticket",
+        "description": "## Heading\n- Item",
+        "description_html": "<h2>Heading</h2><ul><li>Item</li></ul>",
+        "position": 1,
+    }
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/columns/{column_id}/tickets",
+        match=[
+            responses.matchers.json_params_matcher(
+                {
+                    "title": "Markdown Ticket",
+                    "description_markdown": "## Heading\n- Item",
+                }
+            )
+        ],
+        json=ticket_payload,
+        status=201,
+    )
+
+    ticket = client.create_ticket(
+        column_id, title="Markdown Ticket", description_markdown="## Heading\n- Item"
+    )
+    assert ticket.title == "Markdown Ticket"
+
+
+@responses.activate
+def test_update_ticket_with_markdown(client: MelloClient) -> None:
+    ticket_id = "t1t1t1t1-t2t2-t3t3-t4t4-t5t5t5t5t5t5"
+    ticket_payload = {
+        "id": ticket_id,
+        "ticket_number": 103,
+        "ticket_code": "PROJ-103",
+        "column_id": "c1c1c1c1-c2c2-c3c3-c4c4-c5c5c5c5c5c5",
+        "title": "Updated Markdown Ticket",
+        "description": "## Updated",
+        "description_html": "<h2>Updated</h2>",
+        "position": 1,
+    }
+    responses.add(
+        responses.PATCH,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}",
+        match=[
+            responses.matchers.json_params_matcher(
+                {"description_markdown": "## Updated"}
+            )
+        ],
+        json=ticket_payload,
+        status=200,
+    )
+
+    ticket = client.update_ticket(ticket_id, description_markdown="## Updated")
+    assert ticket.title == "Updated Markdown Ticket"
+
+
+@responses.activate
+def test_create_comment_with_markdown(client: MelloClient) -> None:
+    ticket_id = "t1t1t1t1-t2t2-t3t3-t4t4-t5t5t5t5t5t5"
+    comment_payload = {
+        "id": "cm111111-2222-3333-4444-555555555555",
+        "ticket_id": ticket_id,
+        "body": "Raw body",
+        "body_html": "<p>Raw <strong>body</strong></p>",
+        "user_id": "u1u1u1u1-u2u2-u3u3-u4u4-u5u5u5u5u5u5",
+        "created_at": "2026-06-08T12:00:00Z",
+    }
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/comments",
+        match=[
+            responses.matchers.json_params_matcher(
+                {
+                    "body": "Raw body",
+                    "body_markdown": "Raw **body**",
+                }
+            )
+        ],
+        json=comment_payload,
+        status=201,
+    )
+
+    comment = client.create_comment(
+        ticket_id, body="Raw body", body_markdown="Raw **body**"
+    )
+    assert comment.id == "cm111111-2222-3333-4444-555555555555"
+
+
+@responses.activate
+def test_attachment_upload_and_download(client: MelloClient) -> None:
+    ticket_id = "t1t1t1t1-t2t2-t3t3-t4t4-t5t5t5t5t5t5"
+    attachment_id = "att11111-2222-3333-4444-555555555555"
+
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/attachments",
+        json={
+            "id": attachment_id,
+            "ticket_id": ticket_id,
+            "filename": "test.txt",
+            "size": 12,
+            "content_type": "text/plain",
+            "created_at": "2026-06-08T12:00:00Z",
+        },
+        status=201,
+    )
+    att = client.create_attachment(
+        ticket_id,
+        filename="test.txt",
+        file_content=b"hello world\n",
+        content_type="text/plain",
+    )
+    assert att.id == attachment_id
+    assert att.filename == "test.txt"
+
+    responses.add(
+        responses.GET,
+        f"https://mello.mezon.vn/api/v1/attachments/{attachment_id}/download",
+        body=b"hello world\n",
+        status=200,
+    )
+    data = client.download_attachment(attachment_id)
+    assert data == b"hello world\n"
+
+
+def test_verify_webhook_signature() -> None:
+    import hashlib
+    import hmac
+
+    secret = "test_webhook_secret_key"
+    payload = b'{"event":"ticket.created","ticket":{"id":"123"}}'
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    signed_data = f"{timestamp}.".encode("utf-8") + payload
+    sig_hex = hmac.new(secret.encode("utf-8"), signed_data, hashlib.sha256).hexdigest()
+    signature_header = f"sha256={sig_hex}"
+
+    # Valid signature
+    assert (
+        verify_webhook_signature(
+            payload=payload,
+            signature_header=signature_header,
+            timestamp_header=timestamp,
+            secret=secret,
+        )
+        is True
+    )
+
+    # Valid signature with str payload
+    assert (
+        verify_webhook_signature(
+            payload=payload.decode("utf-8"),
+            signature_header=signature_header,
+            timestamp_header=timestamp,
+            secret=secret,
+        )
+        is True
+    )
+
+    # Invalid secret
+    assert (
+        verify_webhook_signature(
+            payload=payload,
+            signature_header=signature_header,
+            timestamp_header=timestamp,
+            secret="wrong_secret",
+        )
+        is False
+    )
+
+    # Corrupt signature header
+    assert (
+        verify_webhook_signature(
+            payload=payload,
+            signature_header="sha256=invalidhex",
+            timestamp_header=timestamp,
+            secret=secret,
+        )
+        is False
+    )
+
+    # Timestamp expired beyond tolerance
+    expired_ts = "2020-01-01T00:00:00Z"
+    expired_signed = f"{expired_ts}.".encode("utf-8") + payload
+    expired_sig = f"sha256={hmac.new(secret.encode('utf-8'), expired_signed, hashlib.sha256).hexdigest()}"
+    assert (
+        verify_webhook_signature(
+            payload=payload,
+            signature_header=expired_sig,
+            timestamp_header=expired_ts,
+            secret=secret,
+            tolerance_seconds=300,
+        )
+        is False
+    )

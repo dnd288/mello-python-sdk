@@ -151,8 +151,20 @@ class FakeClient:
         title: str,
         description: Optional[str] = None,
         position: Optional[int] = None,
+        description_markdown: Optional[str] = None,
+        description_html: Optional[str] = None,
     ) -> Dict[str, Any]:
-        self.calls.append(("create_ticket", column_id, title, description, position))
+        self.calls.append(
+            (
+                "create_ticket",
+                column_id,
+                title,
+                description,
+                position,
+                description_markdown,
+                description_html,
+            )
+        )
         return {"column_id": column_id, "title": title}
 
     def get_ticket(self, ticket_id: str) -> Dict[str, str]:
@@ -174,10 +186,19 @@ class FakeClient:
         return [{"ticket_id": ticket_id}]
 
     def create_comment(
-        self, ticket_id: str, body: str, body_html: Optional[str] = None
+        self,
+        ticket_id: str,
+        body: str,
+        body_html: Optional[str] = None,
+        body_markdown: Optional[str] = None,
     ) -> Dict[str, Any]:
-        self.calls.append(("create_comment", ticket_id, body, body_html))
-        return {"ticket_id": ticket_id, "body": body, "body_html": body_html}
+        self.calls.append(("create_comment", ticket_id, body, body_html, body_markdown))
+        return {
+            "ticket_id": ticket_id,
+            "body": body,
+            "body_html": body_html,
+            "body_markdown": body_markdown,
+        }
 
     def list_history(self, ticket_id: str) -> List[Dict[str, str]]:
         self.calls.append(("list_history", ticket_id))
@@ -206,6 +227,15 @@ class FakeClient:
     def update_label(self, label_id: str, **kwargs: Any) -> Dict[str, Any]:
         self.calls.append(("update_label", label_id, kwargs))
         return {"id": label_id, **kwargs}
+
+    def delete_label(self, label_id: str) -> None:
+        self.calls.append(("delete_label", label_id))
+
+    def attach_label_to_ticket(self, ticket_id: str, label_id: str) -> None:
+        self.calls.append(("attach_label_to_ticket", ticket_id, label_id))
+
+    def detach_label_from_ticket(self, ticket_id: str, label_id: str) -> None:
+        self.calls.append(("detach_label_from_ticket", ticket_id, label_id))
 
     def update_checklist(self, checklist_id: str, **kwargs: Any) -> Dict[str, Any]:
         self.calls.append(("update_checklist", checklist_id, kwargs))
@@ -258,6 +288,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
     server, _client = build_fake_server()
 
     assert sorted(server.tools) == [
+        "attach_label_to_ticket",
         "create_attachment",
         "create_board",
         "create_checklist",
@@ -273,7 +304,9 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "delete_checklist_item",
         "delete_github_installation",
         "delete_github_link",
+        "delete_label",
         "delete_webhook",
+        "detach_label_from_ticket",
         "download_attachment",
         "get_board",
         "get_current_user",
@@ -359,6 +392,15 @@ def test_registered_tools_delegate_to_client_and_serialize_results() -> None:
         {"name": "Auth 1", "color": "#ffa500"},
     )
 
+    server.tools["delete_label"](label_id="lbl-1")
+    assert client.calls[-1] == ("delete_label", "lbl-1")
+
+    server.tools["attach_label_to_ticket"](ticket_id="ticket-1", label_id="lbl-1")
+    assert client.calls[-1] == ("attach_label_to_ticket", "ticket-1", "lbl-1")
+
+    server.tools["detach_label_from_ticket"](ticket_id="ticket-1", label_id="lbl-1")
+    assert client.calls[-1] == ("detach_label_from_ticket", "ticket-1", "lbl-1")
+
     # Attachment tests
     import base64
 
@@ -388,14 +430,24 @@ def test_update_tools_preserve_omitted_and_explicit_null_values() -> None:
 
     assert server.tools["update_ticket"](
         ticket_id="ticket-1",
-        updates={"title": "New title", "pic_user_id": None},
-    ) == {"id": "ticket-1", "title": "New title", "pic_user_id": None}
+        updates={
+            "title": "New title",
+            "pic_user_id": None,
+            "description_markdown": "## MD",
+        },
+    ) == {
+        "id": "ticket-1",
+        "title": "New title",
+        "pic_user_id": None,
+        "description_markdown": "## MD",
+    }
 
     method, ticket_id, kwargs = client.calls[-1]
     assert method == "update_ticket"
     assert ticket_id == "ticket-1"
     assert kwargs["title"] == "New title"
     assert kwargs["pic_user_id"] is None
+    assert kwargs["description_markdown"] == "## MD"
     assert "description" not in kwargs
 
     server.tools["update_board"](board_id="board-1", updates={})

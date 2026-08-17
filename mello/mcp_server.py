@@ -61,6 +61,7 @@ def _ticket_update_kwargs(updates: Optional[Dict[str, Any]]) -> Dict[str, Any]:
             "title",
             "description",
             "description_html",
+            "description_markdown",
             "pic_user_id",
             "supervisor_id",
             "start_date",
@@ -181,6 +182,12 @@ def create_mcp_server(
         return _serialize(client().update_label(label_id, **kwargs))
 
     @server.tool()
+    def delete_label(label_id: str) -> None:
+        """Delete a label."""
+        client().delete_label(label_id)
+        return None
+
+    @server.tool()
     def list_board_tickets(board_id: str) -> Any:
         """List tickets on a Mello board."""
         return _serialize(client().list_board_tickets(board_id))
@@ -191,10 +198,19 @@ def create_mcp_server(
         title: str,
         description: Optional[str] = None,
         position: Optional[int] = None,
+        description_markdown: Optional[str] = None,
+        description_html: Optional[str] = None,
     ) -> Any:
         """Create a ticket in a Mello column."""
         return _serialize(
-            client().create_ticket(column_id, title, description, position)
+            client().create_ticket(
+                column_id,
+                title,
+                description,
+                position,
+                description_markdown=description_markdown,
+                description_html=description_html,
+            )
         )
 
     @server.tool()
@@ -204,7 +220,10 @@ def create_mcp_server(
 
     @server.tool()
     def update_ticket(ticket_id: str, updates: Optional[Dict[str, Any]] = None) -> Any:
-        """Update ticket fields, including nullable pic_user_id, supervisor_id, and date fields."""
+        """
+        Update ticket fields, including nullable pic_user_id, supervisor_id,
+        date fields, and description_markdown.
+        """
         kwargs = _ticket_update_kwargs(updates)
         return _serialize(client().update_ticket(ticket_id, **kwargs))
 
@@ -214,16 +233,35 @@ def create_mcp_server(
         return _serialize(client().move_ticket(ticket_id, column_id))
 
     @server.tool()
+    def attach_label_to_ticket(ticket_id: str, label_id: str) -> None:
+        """Attach a label to a Mello ticket."""
+        client().attach_label_to_ticket(ticket_id, label_id)
+        return None
+
+    @server.tool()
+    def detach_label_from_ticket(ticket_id: str, label_id: str) -> None:
+        """Detach a label from a Mello ticket."""
+        client().detach_label_from_ticket(ticket_id, label_id)
+        return None
+
+    @server.tool()
     def list_comments(ticket_id: str) -> Any:
         """List comments on a Mello ticket."""
         return _serialize(client().list_comments(ticket_id))
 
     @server.tool()
     def create_comment(
-        ticket_id: str, body: str, body_html: Optional[str] = None
+        ticket_id: str,
+        body: str,
+        body_html: Optional[str] = None,
+        body_markdown: Optional[str] = None,
     ) -> Any:
         """Create a comment on a Mello ticket."""
-        return _serialize(client().create_comment(ticket_id, body, body_html))
+        return _serialize(
+            client().create_comment(
+                ticket_id, body, body_html, body_markdown=body_markdown
+            )
+        )
 
     @server.tool()
     def list_history(ticket_id: str) -> Any:
