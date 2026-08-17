@@ -80,21 +80,43 @@ mello-cli ticket update --ticket-id "ticket-uuid" --set start_date=2026-08-04T09
 
 ## Description and Comment Format
 
-Mello currently renders ticket descriptions and comments as **HTML only**. Plain
-text or Markdown will display raw instead of formatted.
+Mello supports Markdown (CommonMark + strikethrough) rendered into HTML server-side
+via `description_markdown` and `body_markdown`, as well as pre-rendered `description_html`
+and `body_html`. Plain `description` or `body` without markdown/html fields is stored as
+escaped literal text.
 
-- For tickets, prefer `--set description_html='<p>...</p>'` (or
-  `--description` when creating a ticket) and send HTML markup.
-- For comments, use `--body-html '<p>...</p>'` alongside `--body` so the
-  rendered version is HTML.
-- Wrap content in at least paragraph tags; convert Markdown to HTML before
-  sending instead of passing Markdown through.
+- **Tickets**: Use `--description-markdown "## Title\n- item"` (or `--set description_markdown=...`)
+  to send Markdown. Alternatively, use `--set description_html='<p>...</p>'`.
+  Note: `description_markdown` and `description_html` are mutually exclusive.
+- **Comments**: Use `--body-markdown "Ready for review, see **final** doc"` alongside
+  `--body` (or instead of `--body-html`) to let Mello render Markdown server-side.
+  Note: `body_markdown` and `body_html` are mutually exclusive.
 
 Examples:
 
 ```bash
-mello-cli ticket update --ticket-id "ticket-uuid" --set description_html='<p>Fix the <strong>login</strong> flow on iOS.</p>'
-mello-cli comment create --ticket-id "ticket-uuid" --body "Fix verified on staging" --body-html '<p>Fix verified on <em>staging</em>.</p>'
+# Create ticket with Markdown description
+mello-cli ticket create --column-id "col-uuid" --title "Launch plan" --description-markdown "## Launch plan\n\n- Ship **release notes**\n- Notify support"
+
+# Update ticket with Markdown description
+mello-cli ticket update --ticket-id "ticket-uuid" --set description_markdown="## Updated plan\n\n- ~~Draft~~ **Final** release"
+
+# Add comment with Markdown formatting
+mello-cli comment create --ticket-id "ticket-uuid" --body "Ready for review" --body-markdown "Ready for review, see the ~~draft~~ **final** doc."
+```
+
+## Labels
+
+Manage board labels and attach/detach labels from tickets:
+
+```bash
+# List and create board labels
+mello-cli label list --board-id "board-uuid"
+mello-cli label create --board-id "board-uuid" --name "High Priority" --color "#ff0000"
+
+# Attach / Detach labels on tickets
+mello-cli ticket attach-label --ticket-id "ticket-uuid" --label-id "label-uuid"
+mello-cli --yes ticket detach-label --ticket-id "ticket-uuid" --label-id "label-uuid"
 ```
 
 ## Attachments

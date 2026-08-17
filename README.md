@@ -228,21 +228,29 @@ client.reorder_columns(
 )
 ```
 
-### Tickets
+### Tickets and Labels
 
 ```python
+# Create ticket with Markdown rendered server-side
 ticket = client.create_ticket(
     column_id="column-uuid",
     title="Fix login crash",
-    description="Steps to reproduce...",
+    description_markdown="## Steps to reproduce\n\n1. Open app\n2. Click login",
 )
 
 ticket_detail = client.get_ticket(ticket.id)
 print(len(ticket_detail.comments))
 
+# Labels
+label = client.create_label(board_id="board-uuid", name="Bug", color="#ff0000")
+client.attach_label_to_ticket(ticket.id, label.id)
+client.detach_label_from_ticket(ticket.id, label.id)
+client.delete_label(label.id)
+
 client.update_ticket(
     ticket.id,
     title="Fix login crash on iOS",
+    description_markdown="## Updated steps\n\n1. Open iOS app",
     pic_user_id="user-uuid",
 )
 
@@ -261,14 +269,30 @@ client.move_ticket(ticket.id, column_id="other-column-uuid", position=0)
 ### Comments, History, And Search
 
 ```python
+# Create comment with Markdown support
 comment = client.create_comment(
     ticket_id="ticket-uuid",
     body="Investigating this issue now.",
+    body_markdown="Investigating this issue **now**.",
 )
 
 comments = client.list_comments(ticket_id="ticket-uuid")
 history = client.list_history(ticket_id="ticket-uuid")
 results = client.search_tickets(workspace_id="workspace-uuid", q="login crash")
+```
+
+### Webhook Signature Verification
+
+```python
+from mello import verify_webhook_signature
+
+is_valid = verify_webhook_signature(
+    payload=raw_request_body_bytes,
+    signature_header=request.headers.get("X-Mello-Signature"),
+    timestamp_header=request.headers.get("X-Mello-Timestamp"),
+    secret="YOUR_WEBHOOK_SECRET",
+    tolerance_seconds=300,
+)
 ```
 
 ## Error Handling

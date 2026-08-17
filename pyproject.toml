@@ -7,7 +7,7 @@ name = "mello-sdk"
 version = "1.1.0"
 description = "Typed Python SDK for the Mello Public REST API"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
@@ -19,8 +19,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -54,6 +52,10 @@ dev = [
     "build>=1.2.0",
     "twine>=5.0.0",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mello*"]
 
 [tool.setuptools.package-data]
 mello = ["py.typed"]

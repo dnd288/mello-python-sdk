@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, NoReturn, Optional, Sequence
 
 import requests
 
-from mello.client import MelloClient
+from mello.client import MelloClient, verify_webhook_signature
 from mello.exceptions import (
     ForbiddenException,
     MelloAPIException,
@@ -32,6 +32,7 @@ UPDATE_FIELDS = {
         "title",
         "description",
         "description_html",
+        "description_markdown",
         "pic_user_id",
         "supervisor_id",
         "start_date",
@@ -191,6 +192,10 @@ def build_parser() -> argparse.ArgumentParser:
     _required(p, "--label-id")
     _updates(p)
     p.set_defaults(func=_cmd_label_update)
+    p = _subparser(l_sub, "delete", "Delete a label")
+    _required(p, "--label-id")
+    p.set_defaults(func=_cmd_label_delete, destructive=True)
+
     ticket = _subparser(groups, "ticket", "Ticket operations")
     t_sub = ticket.add_subparsers(dest="verb", required=True)
     p = _subparser(t_sub, "list", "List board tickets")
@@ -202,6 +207,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = _subparser(t_sub, "create", "Create a ticket")
     _required(p, "--column-id", "--title")
     p.add_argument("--description")
+    p.add_argument("--description-markdown")
+    p.add_argument("--description-html")
     p.add_argument("--position", type=int)
     p.set_defaults(func=_cmd_ticket_create)
     p = _subparser(t_sub, "update", "Update a ticket")
@@ -217,6 +224,12 @@ def build_parser() -> argparse.ArgumentParser:
     p = _subparser(t_sub, "search", "Search workspace tickets")
     _required(p, "--workspace-id", "--query")
     p.set_defaults(func=_cmd_ticket_search)
+    p = _subparser(t_sub, "attach-label", "Attach a label to a ticket")
+    _required(p, "--ticket-id", "--label-id")
+    p.set_defaults(func=_cmd_ticket_attach_label)
+    p = _subparser(t_sub, "detach-label", "Detach a label from a ticket")
+    _required(p, "--ticket-id", "--label-id")
+    p.set_defaults(func=_cmd_ticket_detach_label, destructive=True)
 
     comment = _subparser(groups, "comment", "Comment operations")
     cm_sub = comment.add_subparsers(dest="verb", required=True)
@@ -226,6 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = _subparser(cm_sub, "create", "Create a comment")
     _required(p, "--ticket-id", "--body")
     p.add_argument("--body-html")
+    p.add_argument("--body-markdown")
     p.set_defaults(func=_cmd_comment_create)
 
     history = _subparser(groups, "history", "Ticket history")
@@ -291,6 +305,10 @@ def build_parser() -> argparse.ArgumentParser:
     p = _subparser(w_sub, "redeliver", "Redeliver a webhook event")
     _required(p, "--webhook-id", "--delivery-id")
     p.set_defaults(func=_cmd_webhook_redeliver, destructive=True)
+    p = _subparser(w_sub, "verify", "Verify a webhook delivery signature")
+    _required(p, "--payload", "--signature", "--timestamp", "--secret")
+    p.add_argument("--tolerance", type=int, default=300)
+    p.set_defaults(func=_cmd_webhook_verify)
 
     github = _subparser(groups, "github", "GitHub integration operations")
     g_sub = github.add_subparsers(dest="verb", required=True)
@@ -561,6 +579,11 @@ def _cmd_label_update(client: MelloClient, args: argparse.Namespace) -> Any:
     return client.update_label(args.label_id, **_parse_updates(args, "label"))
 
 
+def _cmd_label_delete(client: MelloClient, args: argparse.Namespace) -> Any:
+    _require_confirmation(args, "delete label %s" % args.label_id)
+    return client.delete_label(args.label_id)
+
+
 def _cmd_ticket_list(client: MelloClient, args: argparse.Namespace) -> Any:
     return client.list_board_tickets(args.board_id)
 
@@ -571,7 +594,12 @@ def _cmd_ticket_get(client: MelloClient, args: argparse.Namespace) -> Any:
 
 def _cmd_ticket_create(client: MelloClient, args: argparse.Namespace) -> Any:
     return client.create_ticket(
-        args.column_id, args.title, args.description, args.position
+        args.column_id,
+        args.title,
+        description=args.description,
+        position=args.position,
+        description_markdown=args.description_markdown,
+        description_html=args.description_html,
     )
 
 
@@ -592,12 +620,28 @@ def _cmd_ticket_search(client: MelloClient, args: argparse.Namespace) -> Any:
     return client.search_tickets(args.workspace_id, args.query)
 
 
+def _cmd_ticket_attach_label(client: MelloClient, args: argparse.Namespace) -> Any:
+    return client.attach_label_to_ticket(args.ticket_id, args.label_id)
+
+
+def _cmd_ticket_detach_label(client: MelloClient, args: argparse.Namespace) -> Any:
+    _require_confirmation(
+        args, "detach label %s from ticket %s" % (args.label_id, args.ticket_id)
+    )
+    return client.detach_label_from_ticket(args.ticket_id, args.label_id)
+
+
 def _cmd_comment_list(client: MelloClient, args: argparse.Namespace) -> Any:
     return client.list_comments(args.ticket_id)
 
 
 def _cmd_comment_create(client: MelloClient, args: argparse.Namespace) -> Any:
-    return client.create_comment(args.ticket_id, args.body, args.body_html)
+    return client.create_comment(
+        args.ticket_id,
+        args.body,
+        body_html=args.body_html,
+        body_markdown=args.body_markdown,
+    )
 
 
 def _cmd_history_list(client: MelloClient, args: argparse.Namespace) -> Any:
@@ -697,6 +741,17 @@ def _cmd_webhook_deliveries(client: MelloClient, args: argparse.Namespace) -> An
 def _cmd_webhook_redeliver(client: MelloClient, args: argparse.Namespace) -> Any:
     _require_confirmation(args, "redeliver webhook delivery %s" % args.delivery_id)
     return client.redeliver_webhook_event(args.webhook_id, args.delivery_id)
+
+
+def _cmd_webhook_verify(client: MelloClient, args: argparse.Namespace) -> Any:
+    valid = verify_webhook_signature(
+        args.payload,
+        args.signature,
+        args.timestamp,
+        args.secret,
+        tolerance_seconds=args.tolerance,
+    )
+    return {"valid": valid}
 
 
 def _cmd_github_installations(client: MelloClient, args: argparse.Namespace) -> Any:

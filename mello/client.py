@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
+import hashlib
+import hmac
 from typing import Any, Dict, List, Optional, Union
 import requests
 
@@ -25,7 +27,56 @@ from mello.models import (
     GithubSearchObjectResult,
     GithubLink,
     Label,
+    parse_datetime,
 )
+
+
+def verify_webhook_signature(
+    payload: Union[str, bytes],
+    signature_header: str,
+    timestamp_header: str,
+    secret: str,
+    tolerance_seconds: Optional[int] = 300,
+) -> bool:
+    """
+    Verify the HMAC-SHA256 signature of a Mello webhook delivery.
+
+    Args:
+        payload: The raw request body as bytes or str.
+        signature_header: Value of the X-Mello-Signature header (format 'sha256=<hex>').
+        timestamp_header: Value of the X-Mello-Timestamp header (RFC3339 timestamp).
+        secret: The webhook signing secret.
+        tolerance_seconds: Maximum allowed age of timestamp in seconds for replay protection.
+                           Pass None to disable timestamp check. Default is 300 (5 minutes).
+
+    Returns:
+        bool: True if signature and timestamp are valid, False otherwise.
+    """
+    if not signature_header or not timestamp_header or not secret:
+        return False
+
+    if not signature_header.startswith("sha256="):
+        return False
+
+    expected_sig_hex = signature_header.removeprefix("sha256=")
+
+    if tolerance_seconds is not None:
+        ts = parse_datetime(timestamp_header)
+        if ts is None:
+            return False
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if abs((now - ts).total_seconds()) > tolerance_seconds:
+            return False
+
+    raw_body = payload if isinstance(payload, bytes) else payload.encode("utf-8")
+    signed_data = f"{timestamp_header}.".encode("utf-8") + raw_body
+
+    mac = hmac.new(secret.encode("utf-8"), signed_data, hashlib.sha256)
+    computed_hex = mac.hexdigest()
+
+    return hmac.compare_digest(computed_hex, expected_sig_hex)
 
 
 class UnsetType:
@@ -338,7 +389,7 @@ class MelloClient:
         Returns:
             List[Label]: List of labels.
         """
-        data = self._request("GET", f"/boards/{board_id}/labels", use_v1=False)
+        data = self._request("GET", f"/boards/{board_id}/labels")
         return [Label.from_dict(lbl) for lbl in (data or [])]
 
     def create_label(
@@ -350,7 +401,7 @@ class MelloClient:
         Args:
             board_id: The ID of the board.
             name: Name of the label.
-            color: Optional label color hex value.
+            color: Optional label color hex value (#rrggbb).
 
         Returns:
             Label: The created label.
@@ -359,9 +410,7 @@ class MelloClient:
         if color is not None:
             payload["color"] = color
 
-        data = self._request(
-            "POST", f"/boards/{board_id}/labels", json_data=payload, use_v1=False
-        )
+        data = self._request("POST", f"/boards/{board_id}/labels", json_data=payload)
         return Label.from_dict(data)
 
     def update_label(
@@ -376,7 +425,7 @@ class MelloClient:
         Args:
             label_id: The ID of the label.
             name: Optional new label name.
-            color: Optional new label color hex value.
+            color: Optional new label color hex value (#rrggbb).
 
         Returns:
             Label: The updated label.
@@ -387,10 +436,17 @@ class MelloClient:
         if not isinstance(color, UnsetType):
             payload["color"] = color
 
-        data = self._request(
-            "PATCH", f"/labels/{label_id}", json_data=payload, use_v1=False
-        )
+        data = self._request("PATCH", f"/labels/{label_id}", json_data=payload)
         return Label.from_dict(data)
+
+    def delete_label(self, label_id: str) -> None:
+        """
+        Delete a label.
+
+        Args:
+            label_id: The ID of the label.
+        """
+        self._request("DELETE", f"/labels/{label_id}")
 
     # --- Tickets Tag ---
 
@@ -413,6 +469,8 @@ class MelloClient:
         title: str,
         description: Optional[str] = None,
         position: Optional[int] = None,
+        description_markdown: Optional[str] = None,
+        description_html: Optional[str] = None,
     ) -> Ticket:
         """
         Create a ticket in a column.
@@ -420,8 +478,10 @@ class MelloClient:
         Args:
             column_id: The ID of the column.
             title: Title of the ticket.
-            description: Optional ticket description.
+            description: Optional plain text ticket description.
             position: Optional ticket position.
+            description_markdown: Optional markdown description (rendered server-side).
+            description_html: Optional HTML description.
 
         Returns:
             Ticket: The created ticket.
@@ -431,6 +491,10 @@ class MelloClient:
             payload["description"] = description
         if position is not None:
             payload["position"] = position
+        if description_markdown is not None:
+            payload["description_markdown"] = description_markdown
+        if description_html is not None:
+            payload["description_html"] = description_html
 
         data = self._request("POST", f"/columns/{column_id}/tickets", json_data=payload)
         return Ticket.from_dict(data)
@@ -454,6 +518,7 @@ class MelloClient:
         title: Union[str, UnsetType] = UNSET,
         description: Union[str, UnsetType] = UNSET,
         description_html: Union[str, UnsetType] = UNSET,
+        description_markdown: Union[Optional[str], UnsetType] = UNSET,
         pic_user_id: Union[Optional[str], UnsetType] = UNSET,
         supervisor_id: Union[Optional[str], UnsetType] = UNSET,
         start_date: Union[Optional[datetime], UnsetType] = UNSET,
@@ -467,6 +532,7 @@ class MelloClient:
             title: Optional updated title.
             description: Optional updated description text.
             description_html: Optional updated HTML description.
+            description_markdown: Optional updated markdown description.
             pic_user_id: Optional user UUID string to set as PIC, or None.
             supervisor_id: Optional user UUID string to set as supervisor, or None.
             start_date: Optional start date datetime.
@@ -482,6 +548,8 @@ class MelloClient:
             payload["description"] = description
         if not isinstance(description_html, UnsetType):
             payload["description_html"] = description_html
+        if not isinstance(description_markdown, UnsetType):
+            payload["description_markdown"] = description_markdown
         if not isinstance(pic_user_id, UnsetType):
             payload["pic_user_id"] = pic_user_id
         if not isinstance(supervisor_id, UnsetType):
@@ -524,6 +592,26 @@ class MelloClient:
         """
         self._request("DELETE", f"/tickets/{ticket_id}")
 
+    def attach_label_to_ticket(self, ticket_id: str, label_id: str) -> None:
+        """
+        Attach a label to a ticket.
+
+        Args:
+            ticket_id: The ID of the ticket.
+            label_id: The ID of the label.
+        """
+        self._request("POST", f"/tickets/{ticket_id}/labels/{label_id}")
+
+    def detach_label_from_ticket(self, ticket_id: str, label_id: str) -> None:
+        """
+        Detach a label from a ticket.
+
+        Args:
+            ticket_id: The ID of the ticket.
+            label_id: The ID of the label.
+        """
+        self._request("DELETE", f"/tickets/{ticket_id}/labels/{label_id}")
+
     # --- Comments Tag ---
 
     def list_comments(self, ticket_id: str) -> List[Comment]:
@@ -540,7 +628,11 @@ class MelloClient:
         return [Comment.from_dict(c) for c in (data or [])]
 
     def create_comment(
-        self, ticket_id: str, body: str, body_html: Optional[str] = None
+        self,
+        ticket_id: str,
+        body: str,
+        body_html: Optional[str] = None,
+        body_markdown: Optional[str] = None,
     ) -> Comment:
         """
         Add a ticket comment.
@@ -549,6 +641,7 @@ class MelloClient:
             ticket_id: The ID of the ticket.
             body: The comment text.
             body_html: Optional HTML version of comment.
+            body_markdown: Optional markdown version of comment (rendered server-side).
 
         Returns:
             Comment: The created comment.
@@ -556,6 +649,8 @@ class MelloClient:
         payload: Dict[str, Any] = {"body": body}
         if body_html is not None:
             payload["body_html"] = body_html
+        if body_markdown is not None:
+            payload["body_markdown"] = body_markdown
 
         data = self._request(
             "POST", f"/tickets/{ticket_id}/comments", json_data=payload
@@ -608,7 +703,9 @@ class MelloClient:
         payload: Dict[str, Any] = {"title": title}
         if position is not None:
             payload["position"] = position
-        data = self._request("POST", f"/tickets/{ticket_id}/checklists", json_data=payload)
+        data = self._request(
+            "POST", f"/tickets/{ticket_id}/checklists", json_data=payload
+        )
         return Checklist.from_dict(data)
 
     def update_checklist(
@@ -754,7 +851,9 @@ class MelloClient:
         """
         Redeliver a webhook event delivery.
         """
-        self._request("POST", f"/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver")
+        self._request(
+            "POST", f"/webhooks/{webhook_id}/deliveries/{delivery_id}/redeliver"
+        )
 
     # --- GitHub Tag ---
 
@@ -849,7 +948,9 @@ class MelloClient:
             params["page"] = page
 
         data = self._request(
-            "GET", f"/tickets/{ticket_id}/github/search", params=params if params else None
+            "GET",
+            f"/tickets/{ticket_id}/github/search",
+            params=params if params else None,
         )
         return [GithubSearchObjectResult.from_dict(res) for res in (data or [])]
 
@@ -899,9 +1000,7 @@ class MelloClient:
         Upload an attachment to a ticket.
         """
         files = {"file": (filename, file_content, content_type)}
-        data = self._request(
-            "POST", f"/tickets/{ticket_id}/attachments", files=files, use_v1=False
-        )
+        data = self._request("POST", f"/tickets/{ticket_id}/attachments", files=files)
         return Attachment.from_dict(data)
 
     def download_attachment(self, attachment_id: str) -> bytes:
@@ -909,5 +1008,5 @@ class MelloClient:
         Download attachment raw content bytes.
         """
         return self._request(
-            "GET", f"/attachments/{attachment_id}/download", use_v1=False, stream=True
+            "GET", f"/attachments/{attachment_id}/download", stream=True
         )
