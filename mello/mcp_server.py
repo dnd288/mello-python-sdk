@@ -84,7 +84,13 @@ def create_mcp_server(
         client_factory = _client_from_env
 
     if server_cls is None:
-        from mcp.server.fastmcp import FastMCP
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError:
+            try:
+                from mcp.server.mcpserver import FastMCP
+            except ImportError:
+                from mcp.server.mcpserver import MCPServer as FastMCP
 
         server_cls = FastMCP
 
@@ -222,9 +228,9 @@ def create_mcp_server(
         return _serialize(client().update_ticket(ticket_id, **kwargs))
 
     @server.tool()
-    def move_ticket(ticket_id: str, column_id: str, position: int) -> Any:
-        """Move a Mello ticket to another column and position."""
-        return _serialize(client().move_ticket(ticket_id, column_id, position))
+    def move_ticket(ticket_id: str, column_id: str) -> Any:
+        """Move a Mello ticket to another column."""
+        return _serialize(client().move_ticket(ticket_id, column_id))
 
     @server.tool()
     def attach_label_to_ticket(ticket_id: str, label_id: str) -> None:
@@ -448,7 +454,6 @@ def create_mcp_server(
         client().delete_github_link(ticket_id, link_id)
         return None
 
-    @server.tool()
     @server.tool()
     def create_attachment(
         ticket_id: str,

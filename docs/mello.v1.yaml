@@ -1577,7 +1577,7 @@ components:
           nullable: true
     MoveTicketRequest:
       type: object
-      required: [ column_id, position ]
+      required: [ column_id ]
       properties:
         column_id:
           type: string
