@@ -130,64 +130,102 @@ For local development from this repository:
 uv sync --extra mcp --extra dev
 ```
 
-Configure the server with environment variables:
+### Configuration & Authentication
+
+The MCP server supports both single-user and multi-user/remote deployments. API keys are resolved in order:
+1. **Explicit tool argument**: `api_key="..."` on any tool call.
+2. **Session tool**: Calling `set_api_key(api_key="...")` once sets the token for the active session.
+3. **HTTP Header / Query Param** (Remote SSE / HTTP mode):
+   - Header: `Authorization: Bearer <token>` or `X-Mello-Api-Key: <token>`
+   - Query Param: `?api_key=<token>`
+4. **Environment Variable**: `MELLO_API_KEY` (fallback default).
 
 ```bash
+# Optional fallback token for stdio or single-user deployments:
 export MELLO_API_KEY="mello_pat_..."
 export MELLO_BASE_URL="https://mello.mezon.vn/api/v1"  # optional
 export MELLO_TIMEOUT="30"                              # optional seconds
 ```
 
-Run it with the console script:
+### Running the Server
+
+Run locally with stdio:
 
 ```bash
 uv run mello-mcp-server
+# or: uv run python -m mello.mcp_server
 ```
 
-Or run the module directly:
+Run as a remote SSE service accessible to other machines on the network:
 
 ```bash
-uv run python -m mello.mcp_server
+uv run mello-mcp-server --transport sse --host 0.0.0.0 --port 8000
+# or with streamable-http:
+# uv run mello-mcp-server --transport streamable-http --host 0.0.0.0 --port 8000
 ```
 
-The MCP server exposes the SDK's full read/write surface: workspaces, boards,
-columns, tickets, comments, history, and search. Update tools accept an
-`updates` object so omitted fields are left unchanged while explicit `null`
-values are sent to Mello for nullable fields.
+You can also configure via environment variables: `MCP_TRANSPORT=sse`, `MCP_HOST=0.0.0.0`, `MCP_PORT=8000`.
 
-### Transport
+### Remote MCP Client Configuration
 
-`main()` selects the transport from the `MCP_TRANSPORT` environment variable.
-The default is `stdio` for local assistant integrations. Set it to
-`streamable-http` (or `sse`) to expose the server over HTTP. In HTTP mode the
-bind address is controlled by `MCP_HOST` (default `0.0.0.0`) and `MCP_PORT`
-(default `8000`).
+Other machines and MCP clients (Claude Desktop, Cursor, etc.) can connect over SSE.
 
-```bash
-MCP_TRANSPORT=streamable-http MCP_PORT=8000 uv run mello-mcp-server
+#### 1. Header-based Authentication (Recommended)
+
+In client configs that support HTTP headers (e.g. Claude Desktop, Cursor):
+
+```json
+{
+  "mcpServers": {
+    "mello": {
+      "url": "http://<server-host>:8000/sse",
+      "headers": {
+        "Authorization": "Bearer mello_pat_your_personal_token"
+      }
+    }
+  }
+}
 ```
+
+#### 2. Query Parameter
+
+```json
+{
+  "mcpServers": {
+    "mello": {
+      "url": "http://<server-host>:8000/sse?api_key=mello_pat_your_personal_token"
+    }
+  }
+}
+```
+
+#### 3. In-Chat Session Key
+
+If your client does not configure custom headers, connect to `http://<server-host>:8000/sse` and instruct your assistant:
+> "Use the `set_api_key` tool with my Mello token `mello_pat_...`"
+
+All subsequent tool calls in that session will use your token.
 
 ### Docker
 
-The repository ships a `Dockerfile` and `docker-compose.yml` that run the
-server with the `streamable-http` transport on port `8000`.
+The repository ships a `Dockerfile` and `docker-compose.yml` for remote deployments.
 
 Build and run with Docker:
 
 ```bash
 docker build -t mello-mcp-server .
-docker run --rm -p 8000:8000 -e MELLO_API_KEY="mello_pat_..." mello-mcp-server
+# Run without hardcoded key (clients provide their own key):
+docker run --rm -p 8000:8000 -e MCP_TRANSPORT=sse mello-mcp-server
+
+# Or with a shared fallback key:
+docker run --rm -p 8000:8000 -e MCP_TRANSPORT=sse -e MELLO_API_KEY="mello_pat_..." mello-mcp-server
 ```
 
-Or use Docker Compose (reads `MELLO_API_KEY` from your environment or `.env`):
+Or use Docker Compose:
 
 ```bash
-export MELLO_API_KEY="mello_pat_..."
 docker compose up --build
 ```
-
-The HTTP endpoint is served at `http://localhost:8000/mcp`. Point an MCP client
-that supports the streamable-http transport at that URL.
 
 ## Usage
 

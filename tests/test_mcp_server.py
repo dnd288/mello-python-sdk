@@ -339,6 +339,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "replace_github_board_repositories",
         "search_github_objects",
         "search_tickets",
+        "set_api_key",
         "start_github_connect",
         "update_board",
         "update_checklist",
@@ -510,3 +511,136 @@ def test_pyproject_declares_mcp_extra_and_console_script() -> None:
     assert '"mcp>=' in pyproject
     assert "[project.scripts]" in pyproject
     assert 'mello-mcp-server = "mello.mcp_server:main"' in pyproject
+
+
+def test_resolve_token_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+    from mello.mcp_server import resolve_token, _session_api_keys
+
+    # 1. Direct param
+    assert resolve_token(api_key="direct-key") == "direct-key"
+
+    # 2. Session attribute
+    class DummySession:
+        _mello_api_key = "session-key"
+
+    class DummyContext:
+        session = DummySession()
+        request_context = None
+
+    assert resolve_token(ctx=DummyContext()) == "session-key"
+    # Direct param overrides session
+    assert resolve_token(api_key="override", ctx=DummyContext()) == "override"
+
+    # 3. HTTP Request headers
+    class DummyRequest:
+        headers = {"authorization": "Bearer bearer-key"}
+        query_params = {}
+
+    class DummyReqContext:
+        request = DummyRequest()
+
+    class DummyContextReq:
+        session = object()
+        request_context = DummyReqContext()
+
+    assert resolve_token(ctx=DummyContextReq()) == "bearer-key"
+
+    # 4. HTTP Request x-mello-api-key
+    DummyRequest.headers = {"x-mello-api-key": "x-key"}
+    assert resolve_token(ctx=DummyContextReq()) == "x-key"
+
+    # 5. HTTP Request query param ?api_key=...
+    DummyRequest.headers = {}
+    DummyRequest.query_params = {"api_key": "query-key"}
+    assert resolve_token(ctx=DummyContextReq()) == "query-key"
+
+    # 6. Session ID in query params mapped in _session_api_keys
+    _session_api_keys["sess-123"] = "cached-sess-token"
+    DummyRequest.query_params = {"session_id": "sess-123"}
+    assert resolve_token(ctx=DummyContextReq()) == "cached-sess-token"
+
+    # 7. Fallback to MELLO_API_KEY
+    DummyRequest.query_params = {}
+    monkeypatch.setenv("MELLO_API_KEY", "env-key")
+    assert resolve_token() == "env-key"
+
+    # 8. None when nothing is provided
+    monkeypatch.delenv("MELLO_API_KEY", raising=False)
+    assert resolve_token() is None
+
+
+def test_set_api_key_tool_stores_key() -> None:
+    server, _ = build_fake_server()
+
+    class DummySession:
+        pass
+
+    class DummyRequest:
+        query_params = {"session_id": "sid-999"}
+
+    class DummyContext:
+        session = DummySession()
+        request_context = type("RC", (), {"request": DummyRequest()})()
+
+    ctx = DummyContext()
+    res = server.tools["set_api_key"]("mello_pat_secret_12345", ctx=ctx)
+    assert res["status"] == "authenticated"
+    assert getattr(ctx.session, "_mello_api_key") == "mello_pat_secret_12345"
+    from mello.mcp_server import _session_api_keys
+
+    assert _session_api_keys.get("sid-999") == "mello_pat_secret_12345"
+
+
+def test_dynamic_client_resolution_without_key_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mello.mcp_server import create_mcp_server
+
+    monkeypatch.delenv("MELLO_API_KEY", raising=False)
+
+    server = create_mcp_server(server_cls=FakeFastMCP)
+    with pytest.raises(RuntimeError, match="Mello API key is required"):
+        server.tools["get_current_user"]()
+
+
+def test_dynamic_client_resolution_with_explicit_param(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mello.mcp_server import create_mcp_server
+
+    monkeypatch.delenv("MELLO_API_KEY", raising=False)
+
+    recorded_tokens = []
+
+    def factory(token=None):
+        recorded_tokens.append(token)
+        return FakeClient()
+
+    server = create_mcp_server(client_factory=factory, server_cls=FakeFastMCP)
+    server.tools["get_current_user"](api_key="explicit-token")
+    assert recorded_tokens[-1] == "explicit-token"
+
+
+def test_sse_auth_middleware_captures_tokens() -> None:
+    from starlette.applications import Starlette
+    from starlette.responses import PlainTextResponse
+    from starlette.routing import Route
+    from starlette.testclient import TestClient
+    from mello.mcp_server import MelloSseAuthMiddleware, _session_api_keys
+
+    async def sse_handler(request):
+        return PlainTextResponse(
+            "event: endpoint\ndata: /messages/?session_id=session-abc\n\n"
+        )
+
+    app = Starlette(routes=[Route("/sse", sse_handler)])
+    app.add_middleware(MelloSseAuthMiddleware)
+
+    client = TestClient(app)
+    # 1. Via query param
+    client.get("/sse?api_key=param-token")
+    assert _session_api_keys.get("session-abc") == "param-token"
+
+    # 2. Via Bearer header
+    client.get("/sse", headers={"Authorization": "Bearer header-token"})
+    assert _session_api_keys.get("session-abc") == "header-token"
