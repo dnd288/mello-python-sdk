@@ -31,7 +31,7 @@ from a prior read/search response rather than guessing.
 | Detach label | `mello-cli --yes ticket detach-label --ticket-id ID --label-id ID` | **confirm** |
 | Search tickets | `mello-cli ticket search --workspace-id ID --query TEXT` | Read-only |
 | List comments | `mello-cli comment list --ticket-id ID` | Read-only |
-| Create comment | `mello-cli comment create --ticket-id ID --body TEXT [--body-markdown MD] [--body-html HTML]` | `body_markdown` renders server-side |
+| Create comment | `mello-cli comment create --ticket-id ID [--body TEXT] [--body-markdown MD] [--body-html HTML]` | At least one body format required; `body_markdown` renders server-side |
 | Ticket history | `mello-cli history list --ticket-id ID` | Read-only |
 | Create checklist | `mello-cli checklist create --ticket-id ID --title TITLE [--position N]` | |
 | Update checklist | `mello-cli checklist update --checklist-id ID --set title=TITLE` | Fields: `title`, `position` |
@@ -45,7 +45,7 @@ from a prior read/search response rather than guessing.
 | Create webhook | `mello-cli --yes webhook create --workspace-id ID --model-type board --model-id ID --callback-url URL [--event EVENT]` | **confirm**; repeat `--event` |
 | Update webhook | `mello-cli --yes webhook update --webhook-id ID --set active=false` | **confirm**; fields: `active`, `events`, `description`, `callback_url` |
 | Delete webhook | `mello-cli --yes webhook delete --webhook-id ID` | **confirm** |
-| Delivery history | `mello-cli webhook deliveries --webhook-id ID` | Read-only |
+| Delivery history | `mello-cli webhook deliveries --webhook-id ID [--limit N] [--cursor STR]` | Read-only; cursor-based pagination |
 | Redeliver event | `mello-cli --yes webhook redeliver --webhook-id ID --delivery-id ID` | **confirm** |
 | Verify webhook | `mello-cli webhook verify --payload BODY --signature SIG --timestamp TS --secret SECRET` | Verifies HMAC-SHA256 signature |
 | GitHub installations | `mello-cli github installations --workspace-id ID` | Read-only |

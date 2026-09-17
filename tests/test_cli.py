@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pytest
 
@@ -72,9 +72,17 @@ class FakeClient:
         self.calls.append(("detach_label_from_ticket", (ticket_id, label_id), {}))
 
     def create_comment(
-        self, ticket_id: str, body: str, **kwargs: Any
+        self, ticket_id: str, body: Optional[str] = None, **kwargs: Any
     ) -> Dict[str, Any]:
-        return self._call("create_comment", ticket_id, body, **kwargs)
+        if body is not None:
+            return self._call("create_comment", ticket_id, body, **kwargs)
+        return self._call("create_comment", ticket_id, **kwargs)
+
+    def list_webhook_deliveries(
+        self, webhook_id: str, limit: Any = None, cursor: Any = None
+    ) -> List[Dict[str, Any]]:
+        self.calls.append(("list_webhook_deliveries", (webhook_id,), {"limit": limit, "cursor": cursor}))
+        return [{"id": "del-1"}]
 
     def update_ticket(self, ticket_id: str, **kwargs: Any) -> Dict[str, Any]:
         return self._call("update_ticket", ticket_id, **kwargs)
@@ -547,3 +555,58 @@ def test_webhook_verify_cli(
     )
     res = output(capsys)
     assert res["data"]["valid"] is True
+
+
+def test_comment_create_markdown_only_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "comment",
+                "create",
+                "--ticket-id",
+                "ticket-1",
+                "--body-markdown",
+                "**only md**",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    _method, args, kwargs = clients["client"].calls[-1]
+    assert args == ("ticket-1",)
+    assert kwargs["body_markdown"] == "**only md**"
+
+
+def test_webhook_deliveries_cli(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("MELLO_API_KEY", "token")
+    clients: Dict[str, FakeClient] = {}
+
+    assert (
+        main(
+            [
+                "webhook",
+                "deliveries",
+                "--webhook-id",
+                "wh-1",
+                "--limit",
+                "10",
+                "--cursor",
+                "cur-1",
+            ],
+            make_factory(clients),
+        )
+        == 0
+    )
+    output(capsys)
+    _method, args, kwargs = clients["client"].calls[-1]
+    assert args == ("wh-1",)
+    assert kwargs["limit"] == 10
+    assert kwargs["cursor"] == "cur-1"

@@ -252,14 +252,14 @@ def create_mcp_server(
     @server.tool()
     def create_comment(
         ticket_id: str,
-        body: str,
+        body: Optional[str] = None,
         body_html: Optional[str] = None,
         body_markdown: Optional[str] = None,
     ) -> Any:
         """Create a comment on a Mello ticket."""
         return _serialize(
             client().create_comment(
-                ticket_id, body, body_html, body_markdown=body_markdown
+                ticket_id, body=body, body_html=body_html, body_markdown=body_markdown
             )
         )
 
@@ -358,9 +358,15 @@ def create_mcp_server(
         return None
 
     @server.tool()
-    def list_webhook_deliveries(webhook_id: str) -> Any:
+    def list_webhook_deliveries(
+        webhook_id: str,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> Any:
         """List webhook delivery attempts."""
-        return _serialize(client().list_webhook_deliveries(webhook_id))
+        return _serialize(
+            client().list_webhook_deliveries(webhook_id, limit=limit, cursor=cursor)
+        )
 
     @server.tool()
     def redeliver_webhook_event(webhook_id: str, delivery_id: str) -> None:

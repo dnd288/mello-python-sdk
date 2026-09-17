@@ -188,7 +188,7 @@ class FakeClient:
     def create_comment(
         self,
         ticket_id: str,
-        body: str,
+        body: Optional[str] = None,
         body_html: Optional[str] = None,
         body_markdown: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -199,6 +199,15 @@ class FakeClient:
             "body_html": body_html,
             "body_markdown": body_markdown,
         }
+
+    def list_webhook_deliveries(
+        self,
+        webhook_id: str,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        self.calls.append(("list_webhook_deliveries", webhook_id, limit, cursor))
+        return [{"id": "del-1", "webhook_id": webhook_id, "limit": limit, "cursor": cursor}]
 
     def list_history(self, ticket_id: str) -> List[Dict[str, str]]:
         self.calls.append(("list_history", ticket_id))
@@ -482,6 +491,16 @@ def test_to_update_kwargs_maps_missing_fields_to_unset() -> None:
 
     assert kwargs["name"] == "Next"
     assert kwargs["color"] is UNSET
+
+
+def test_create_comment_and_webhook_deliveries_tools() -> None:
+    server, client = build_fake_server()
+
+    server.tools["create_comment"](ticket_id="ticket-1", body_markdown="**bold**")
+    assert client.calls[-1] == ("create_comment", "ticket-1", None, None, "**bold**")
+
+    server.tools["list_webhook_deliveries"](webhook_id="wh-1", limit=10, cursor="cur-abc")
+    assert client.calls[-1] == ("list_webhook_deliveries", "wh-1", 10, "cur-abc")
 
 
 def test_pyproject_declares_mcp_extra_and_console_script() -> None:

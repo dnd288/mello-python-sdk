@@ -630,7 +630,7 @@ class MelloClient:
     def create_comment(
         self,
         ticket_id: str,
-        body: str,
+        body: Optional[str] = None,
         body_html: Optional[str] = None,
         body_markdown: Optional[str] = None,
     ) -> Comment:
@@ -639,14 +639,23 @@ class MelloClient:
 
         Args:
             ticket_id: The ID of the ticket.
-            body: The comment text.
+            body: Optional plain text comment.
             body_html: Optional HTML version of comment.
             body_markdown: Optional markdown version of comment (rendered server-side).
 
         Returns:
             Comment: The created comment.
         """
-        payload: Dict[str, Any] = {"body": body}
+        if not body and not body_html and not body_markdown:
+            raise ValueError(
+                "At least one of body, body_html, or body_markdown must be provided."
+            )
+        if body_html is not None and body_markdown is not None:
+            raise ValueError("body_html and body_markdown are mutually exclusive.")
+
+        payload: Dict[str, Any] = {}
+        if body is not None:
+            payload["body"] = body
         if body_html is not None:
             payload["body_html"] = body_html
         if body_markdown is not None:
@@ -840,11 +849,34 @@ class MelloClient:
         """
         self._request("DELETE", f"/webhooks/{webhook_id}")
 
-    def list_webhook_deliveries(self, webhook_id: str) -> List[Delivery]:
+    def list_webhook_deliveries(
+        self,
+        webhook_id: str,
+        limit: Optional[int] = None,
+        cursor: Optional[str] = None,
+    ) -> List[Delivery]:
         """
         List webhook deliveries.
+
+        Args:
+            webhook_id: The ID of the webhook.
+            limit: Maximum number of deliveries to return (1-100, default 25).
+            cursor: Cursor for pagination from previous page's next_cursor.
+
+        Returns:
+            List[Delivery]: List of webhook delivery objects.
         """
-        data = self._request("GET", f"/webhooks/{webhook_id}/deliveries")
+        params: Dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if cursor is not None:
+            params["cursor"] = cursor
+
+        data = self._request(
+            "GET",
+            f"/webhooks/{webhook_id}/deliveries",
+            params=params if params else None,
+        )
         return [Delivery.from_dict(d) for d in (data or [])]
 
     def redeliver_webhook_event(self, webhook_id: str, delivery_id: str) -> None:

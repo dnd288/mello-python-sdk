@@ -238,7 +238,8 @@ def build_parser() -> argparse.ArgumentParser:
     _required(p, "--ticket-id")
     p.set_defaults(func=_cmd_comment_list)
     p = _subparser(cm_sub, "create", "Create a comment")
-    _required(p, "--ticket-id", "--body")
+    _required(p, "--ticket-id")
+    p.add_argument("--body")
     p.add_argument("--body-html")
     p.add_argument("--body-markdown")
     p.set_defaults(func=_cmd_comment_create)
@@ -302,6 +303,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=_cmd_webhook_delete, destructive=True)
     p = _subparser(w_sub, "deliveries", "List webhook deliveries")
     _required(p, "--webhook-id")
+    p.add_argument("--limit", type=int)
+    p.add_argument("--cursor")
     p.set_defaults(func=_cmd_webhook_deliveries)
     p = _subparser(w_sub, "redeliver", "Redeliver a webhook event")
     _required(p, "--webhook-id", "--delivery-id")
@@ -637,9 +640,13 @@ def _cmd_comment_list(client: MelloClient, args: argparse.Namespace) -> Any:
 
 
 def _cmd_comment_create(client: MelloClient, args: argparse.Namespace) -> Any:
+    if not args.body and not args.body_html and not args.body_markdown:
+        raise CLIError(
+            "At least one of --body, --body-html, or --body-markdown is required"
+        )
     return client.create_comment(
         args.ticket_id,
-        args.body,
+        body=args.body,
         body_html=args.body_html,
         body_markdown=args.body_markdown,
     )
@@ -736,7 +743,9 @@ def _cmd_webhook_delete(client: MelloClient, args: argparse.Namespace) -> Any:
 
 
 def _cmd_webhook_deliveries(client: MelloClient, args: argparse.Namespace) -> Any:
-    return client.list_webhook_deliveries(args.webhook_id)
+    return client.list_webhook_deliveries(
+        args.webhook_id, limit=args.limit, cursor=args.cursor
+    )
 
 
 def _cmd_webhook_redeliver(client: MelloClient, args: argparse.Namespace) -> Any:

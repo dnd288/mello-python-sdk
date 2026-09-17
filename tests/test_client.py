@@ -1093,6 +1093,26 @@ def test_webhook_endpoints(client: MelloClient) -> None:
     assert len(deliveries) == 1
     assert deliveries[0].id == "del-1"
 
+    # list_webhook_deliveries with limit and cursor
+    responses.add(
+        responses.GET,
+        "https://mello.mezon.vn/api/v1/webhooks/wh-1/deliveries?limit=10&cursor=cur-1",
+        json=[
+            {
+                "id": "del-2",
+                "webhook_id": "wh-1",
+                "event_id": "ev-2",
+                "event_type": "ticket.updated",
+                "status": "succeeded",
+                "attempts": 1,
+            }
+        ],
+        status=200,
+    )
+    deliveries_paged = client.list_webhook_deliveries("wh-1", limit=10, cursor="cur-1")
+    assert len(deliveries_paged) == 1
+    assert deliveries_paged[0].id == "del-2"
+
     # redeliver_webhook_event
     responses.add(
         responses.POST,
@@ -1376,6 +1396,30 @@ def test_create_comment_with_markdown(client: MelloClient) -> None:
         ticket_id, body="Raw body", body_markdown="Raw **body**"
     )
     assert comment.id == "cm111111-2222-3333-4444-555555555555"
+
+    # Only body_markdown (no body)
+    responses.add(
+        responses.POST,
+        f"https://mello.mezon.vn/api/v1/tickets/{ticket_id}/comments",
+        match=[
+            responses.matchers.json_params_matcher(
+                {
+                    "body_markdown": "Markdown only",
+                }
+            )
+        ],
+        json=comment_payload,
+        status=201,
+    )
+    comment2 = client.create_comment(ticket_id, body_markdown="Markdown only")
+    assert comment2.id == "cm111111-2222-3333-4444-555555555555"
+
+    import pytest
+    with pytest.raises(ValueError, match="At least one of"):
+        client.create_comment(ticket_id)
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        client.create_comment(ticket_id, body_html="<p>a</p>", body_markdown="a")
 
 
 @responses.activate

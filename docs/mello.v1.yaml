@@ -738,6 +738,23 @@ paths:
       operationId: listWebhookDeliveries
       parameters:
         - $ref: '#/components/parameters/WebhookID'
+        - name: limit
+          in: query
+          required: false
+          description: Page size. Defaults to 25, capped at 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: cursor
+          in: query
+          required: false
+          description: >-
+            Opaque cursor from the `next_cursor` of the previous page. Omit to start from the
+            newest delivery.
+          schema:
+            type: string
       responses:
         '200':
           description: List of deliveries
@@ -1644,14 +1661,18 @@ components:
           minimum: 0
     CreateCommentRequest:
       type: object
-      required: [ body ]
+      description: >
+        At least one of body, body_html, or body_markdown must produce non-empty content.
+        body_html and body_markdown are mutually exclusive — sending both is a validation error.
       properties:
         body:
           type: string
-        body_markdown:
-          type: string
+          description: Plain text. Wrapped in an escaped paragraph unless body_html/body_markdown is also sent.
         body_html:
           type: string
+        body_markdown:
+          type: string
+          description: Rendered server-side (CommonMark + strikethrough) into the stored body_html.
     createWebhookRequest:
       type: object
       required: [workspace_id, model_type, model_id, callback_url]
