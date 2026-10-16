@@ -1059,6 +1059,17 @@ def main() -> None:
 
     server = create_mcp_server()
 
+    # Configure transport security for reverse proxies (e.g. Traefik / Nginx)
+    allowed_hosts = os.environ.get("MCP_ALLOWED_HOSTS", "").strip()
+    if hasattr(server, "settings") and hasattr(server.settings, "transport_security") and server.settings.transport_security:
+        if allowed_hosts:
+            for host in allowed_hosts.split(","):
+                h = host.strip()
+                if h and h not in server.settings.transport_security.allowed_hosts:
+                    server.settings.transport_security.allowed_hosts.append(h)
+        if os.environ.get("MCP_DISABLE_DNS_REBINDING", "").lower() in ("true", "1", "yes"):
+            server.settings.transport_security.enable_dns_rebinding_protection = False
+
     if args.transport == "sse":
         import uvicorn
         import anyio
