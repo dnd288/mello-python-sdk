@@ -170,10 +170,12 @@ def resolve_token(
 
     if ctx is not None:
         session = getattr(ctx, "session", None)
-        if session is not None and hasattr(session, "_mello_api_key"):
-            s_key = getattr(session, "_mello_api_key")
-            if s_key and str(s_key).strip():
-                return str(s_key).strip()
+        if session is not None:
+            for target in (session, getattr(session, "_connection", None)):
+                if target is not None and hasattr(target, "_mello_api_key"):
+                    s_key = getattr(target, "_mello_api_key")
+                    if s_key and str(s_key).strip():
+                        return str(s_key).strip()
 
         req_ctx = getattr(ctx, "request_context", None)
         req = getattr(req_ctx, "request", None)
@@ -335,8 +337,10 @@ def create_mcp_server(
         # If an explicit api_key was passed and ctx is available, remember it for the session
         if api_key and str(api_key).strip() and ctx is not None:
             session = getattr(ctx, "session", None)
-            if session is not None and not getattr(session, "_mello_api_key", None):
-                setattr(session, "_mello_api_key", str(api_key).strip())
+            if session is not None:
+                for target in (session, getattr(session, "_connection", None)):
+                    if target is not None and not getattr(target, "_mello_api_key", None):
+                        setattr(target, "_mello_api_key", str(api_key).strip())
 
         base_url = os.environ.get("MELLO_BASE_URL", "https://mello.mezon.vn/api/v1")
         timeout = float(os.environ.get("MELLO_TIMEOUT", "30.0"))
@@ -355,7 +359,9 @@ def create_mcp_server(
         if ctx is not None:
             session = getattr(ctx, "session", None)
             if session is not None:
-                setattr(session, "_mello_api_key", clean_key)
+                for target in (session, getattr(session, "_connection", None)):
+                    if target is not None:
+                        setattr(target, "_mello_api_key", clean_key)
 
             req_ctx = getattr(ctx, "request_context", None)
             req = getattr(req_ctx, "request", None)
