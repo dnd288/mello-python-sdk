@@ -424,7 +424,11 @@ def _require_confirmation(args: argparse.Namespace, action: str) -> None:
 def _client_from_args(
     args: argparse.Namespace, factory: Optional[ClientFactory]
 ) -> MelloClient:
-    token = args.token or os.environ.get("MELLO_API_KEY")
+    token = (
+        args.token
+        or os.environ.get("MELLO_API_KEY")
+        or os.environ.get("MELLO_AUTH_TOKEN")
+    )
     if not token:
         raise CLIError("MELLO_API_KEY or --token is required", "config")
     base_url = args.base_url or os.environ.get(

@@ -87,7 +87,7 @@ _session_api_keys: Dict[str, str] = _BoundedCache(
 
 
 def _client_from_env() -> MelloClient:
-    token = os.environ.get("MELLO_API_KEY")
+    token = os.environ.get("MELLO_API_KEY") or os.environ.get("MELLO_AUTH_TOKEN")
     if not token:
         raise RuntimeError("MELLO_API_KEY is required to run the Mello MCP server")
 
@@ -186,7 +186,7 @@ def resolve_token(
             if sid and sid in _session_api_keys:
                 return _session_api_keys[sid]
 
-    env_key = os.environ.get("MELLO_API_KEY")
+    env_key = os.environ.get("MELLO_API_KEY") or os.environ.get("MELLO_AUTH_TOKEN")
     if env_key and env_key.strip():
         return env_key.strip()
 
