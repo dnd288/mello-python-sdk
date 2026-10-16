@@ -877,7 +877,8 @@ class MelloClient:
             f"/webhooks/{webhook_id}/deliveries",
             params=params if params else None,
         )
-        return [Delivery.from_dict(d) for d in (data or [])]
+        items = data.get("items", []) if isinstance(data, dict) else (data or [])
+        return [Delivery.from_dict(d) for d in items]
 
     def redeliver_webhook_event(self, webhook_id: str, delivery_id: str) -> None:
         """

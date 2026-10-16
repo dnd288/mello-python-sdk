@@ -181,6 +181,9 @@ class FakeClient:
         self.calls.append(("move_ticket", ticket_id, column_id, position))
         return {"ticket_id": ticket_id, "column_id": column_id, "position": position}
 
+    def delete_ticket(self, ticket_id: str) -> None:
+        self.calls.append(("delete_ticket", ticket_id))
+
     def list_comments(self, ticket_id: str) -> List[Dict[str, str]]:
         self.calls.append(("list_comments", ticket_id))
         return [{"ticket_id": ticket_id}]
@@ -314,6 +317,7 @@ def test_create_mcp_server_registers_full_tool_surface() -> None:
         "delete_github_installation",
         "delete_github_link",
         "delete_label",
+        "delete_ticket",
         "delete_webhook",
         "detach_label_from_ticket",
         "download_attachment",
@@ -361,6 +365,8 @@ def test_registered_tools_delegate_to_client_and_serialize_results() -> None:
     assert server.tools["create_ticket"](
         column_id="column-1", title="Ship MCP", description="Do it", position=2
     ) == {"column_id": "column-1", "title": "Ship MCP"}
+    assert server.tools["delete_ticket"](ticket_id="ticket-1") is None
+    assert client.calls[-1] == ("delete_ticket", "ticket-1")
     assert server.tools["delete_board"](board_id="board-1") is None
     assert client.calls[-1] == ("delete_board", "board-1")
 
@@ -644,3 +650,18 @@ def test_sse_auth_middleware_captures_tokens() -> None:
     # 2. Via Bearer header
     client.get("/sse", headers={"Authorization": "Bearer header-token"})
     assert _session_api_keys.get("session-abc") == "header-token"
+
+
+def test_bounded_cache_evicts_lru_and_expired() -> None:
+    from mello.mcp_server import _BoundedCache
+
+    cache = _BoundedCache(maxsize=2, ttl_seconds=60.0)
+    cache["a"] = "1"
+    cache["b"] = "2"
+    # Access "a" so "b" is oldest
+    assert cache["a"] == "1"
+    cache["c"] = "3"
+    assert "b" not in cache
+    assert cache.get("a") == "1"
+    assert cache.get("c") == "3"
+

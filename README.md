@@ -116,7 +116,7 @@ Then make sure `mello-cli` is installed globally (see above) and
 ## MCP Server
 
 The package can also run as a Model Context Protocol server for AI assistants
-that support MCP tools.
+that support MCP tools. See [MCP_DEPLOYMENT_GUIDE.md](MCP_DEPLOYMENT_GUIDE.md) for a complete production deployment and multi-user setup guide (in Vietnamese).
 
 Install the MCP extra:
 

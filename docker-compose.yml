@@ -7,12 +7,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Required: Mello personal access token.
-      MELLO_API_KEY: ${MELLO_API_KEY:?MELLO_API_KEY is required}
+      # Optional fallback Mello personal access token (leave empty for strict per-user auth).
+      MELLO_API_KEY: ${MELLO_API_KEY:-}
       # Optional Mello API overrides.
       MELLO_BASE_URL: ${MELLO_BASE_URL:-https://mello.mezon.vn/api/v1}
       MELLO_TIMEOUT: ${MELLO_TIMEOUT:-30}
-      # MCP transport settings for the container.
-      MCP_TRANSPORT: streamable-http
+      # MCP transport settings for the container (sse or streamable-http).
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-sse}
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8000

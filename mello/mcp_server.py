@@ -1,29 +1,89 @@
 import argparse
 import base64
+from collections import OrderedDict
 from datetime import datetime
 import inspect
 import os
 import re
+import threading
+import time
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type
 
 from mello.client import MelloClient, UNSET
 from mello.serialize import serialize as _serialize
 
 try:
-    from mcp.server.fastmcp import Context, FastMCP
+    from mcp.server.fastmcp import Context, FastMCP  # type: ignore
 except ImportError:
     try:
-        from mcp.server.mcpserver import Context, FastMCP  # type: ignore
+        from mcp.server.mcpserver import Context, MCPServer as FastMCP  # type: ignore
     except ImportError:
         Context = Any  # type: ignore
         FastMCP = Any  # type: ignore
 
 ClientFactory = Callable[..., Any]
 
+
+class _BoundedCache(OrderedDict):  # type: ignore[type-arg]
+    """Thread-safe bounded LRU/TTL dictionary for multi-user session and client caching."""
+
+    def __init__(self, maxsize: int = 1024, ttl_seconds: float = 86400.0) -> None:
+        super().__init__()
+        self.maxsize = maxsize
+        self.ttl_seconds = ttl_seconds
+        self._timestamps: Dict[Any, float] = {}
+        self._lock = threading.RLock()
+
+    def _evict_expired(self) -> None:
+        now = time.monotonic()
+        expired = [
+            k
+            for k, ts in list(self._timestamps.items())
+            if now - ts > self.ttl_seconds
+        ]
+        for k in expired:
+            super().pop(k, None)
+            self._timestamps.pop(k, None)
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        with self._lock:
+            self._evict_expired()
+            if key in self:
+                self.move_to_end(key)
+            super().__setitem__(key, value)
+            self._timestamps[key] = time.monotonic()
+            while len(self) > self.maxsize:
+                oldest_key, _ = self.popitem(last=False)
+                self._timestamps.pop(oldest_key, None)
+
+    def __getitem__(self, key: Any) -> Any:
+        with self._lock:
+            self._evict_expired()
+            value = super().__getitem__(key)
+            self.move_to_end(key)
+            self._timestamps[key] = time.monotonic()
+            return value
+
+    def __contains__(self, key: Any) -> bool:
+        with self._lock:
+            self._evict_expired()
+            return super().__contains__(key)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        with self._lock:
+            if key in self:
+                return self[key]
+            return default
+
+
 # In-memory client cache: (token, base_url, timeout) -> MelloClient
-_client_cache: Dict[Tuple[str, str, float], MelloClient] = {}
-# Session ID -> token mapping for SSE connections
-_session_api_keys: Dict[str, str] = {}
+_client_cache: Dict[Tuple[str, str, float], MelloClient] = _BoundedCache(
+    maxsize=256, ttl_seconds=3600.0
+)
+# Session ID -> token mapping for SSE and Streamable-HTTP connections
+_session_api_keys: Dict[str, str] = _BoundedCache(
+    maxsize=2048, ttl_seconds=86400.0
+)
 
 
 def _client_from_env() -> MelloClient:
@@ -73,6 +133,26 @@ def _extract_token_from_request(request: Any) -> Optional[str]:
     return None
 
 
+def _extract_session_id_from_request(request: Any) -> Optional[str]:
+    """Extract session ID from query parameters (SSE) or Mcp-Session-Id header (Streamable HTTP)."""
+    if request is None:
+        return None
+
+    query_params = getattr(request, "query_params", None)
+    if query_params and hasattr(query_params, "get"):
+        sid = query_params.get("session_id")
+        if sid and str(sid).strip():
+            return str(sid).strip()
+
+    headers = getattr(request, "headers", None)
+    if headers and hasattr(headers, "get"):
+        mcp_sid = headers.get("mcp-session-id")
+        if mcp_sid and str(mcp_sid).strip():
+            return str(mcp_sid).strip()
+
+    return None
+
+
 def resolve_token(
     api_key: Optional[str] = None,
     ctx: Optional[Any] = None,
@@ -102,11 +182,9 @@ def resolve_token(
             if token:
                 return token
 
-            q_params = getattr(req, "query_params", None)
-            if q_params and hasattr(q_params, "get"):
-                sid = q_params.get("session_id")
-                if sid and sid in _session_api_keys:
-                    return _session_api_keys[sid]
+            sid = _extract_session_id_from_request(req)
+            if sid and sid in _session_api_keys:
+                return _session_api_keys[sid]
 
     env_key = os.environ.get("MELLO_API_KEY")
     if env_key and env_key.strip():
@@ -117,9 +195,9 @@ def resolve_token(
 
 class MelloSseAuthMiddleware:
     """
-    ASGI middleware for SSE transport:
+    ASGI middleware for SSE and Streamable-HTTP transports:
     - Captures API key from GET /sse headers or query parameters and associates it with the session_id
-    - Captures API key from POST /messages headers or query parameters
+    - Captures API key from POST /messages or /mcp headers or query parameters and associates it with session_id or Mcp-Session-Id
     """
 
     def __init__(self, app: Any):
@@ -132,15 +210,24 @@ class MelloSseAuthMiddleware:
 
                 request = Request(scope)
                 token = _extract_token_from_request(request)
-                session_id = request.query_params.get("session_id")
+                session_id = _extract_session_id_from_request(request)
 
                 if session_id and token:
                     _session_api_keys[session_id] = token
 
-                if scope.get("path", "").endswith("/sse") and token:
+                if token:
 
                     async def intercepting_send(message: Dict[str, Any]) -> None:
-                        if message.get("type") == "http.response.body":
+                        msg_type = message.get("type")
+                        if msg_type == "http.response.start":
+                            for raw_k, raw_v in message.get("headers", []):
+                                if raw_k.decode("latin1").lower() == "mcp-session-id":
+                                    sid_val = raw_v.decode("latin1").strip()
+                                    if sid_val:
+                                        _session_api_keys[sid_val] = token
+                        elif msg_type == "http.response.body" and scope.get(
+                            "path", ""
+                        ).endswith("/sse"):
                             body = message.get("body", b"").decode(
                                 "utf-8", errors="ignore"
                             )
@@ -273,11 +360,9 @@ def create_mcp_server(
             req_ctx = getattr(ctx, "request_context", None)
             req = getattr(req_ctx, "request", None)
             if req is not None:
-                q_params = getattr(req, "query_params", None)
-                if q_params and hasattr(q_params, "get"):
-                    sid = q_params.get("session_id")
-                    if sid:
-                        _session_api_keys[sid] = clean_key
+                sid = _extract_session_id_from_request(req)
+                if sid:
+                    _session_api_keys[sid] = clean_key
 
         prefix = (
             clean_key[:14] + "..." if len(clean_key) > 14 else clean_key
@@ -535,6 +620,16 @@ def create_mcp_server(
         return _serialize(
             get_client(api_key=api_key, ctx=ctx).move_ticket(ticket_id, column_id)
         )
+
+    @server.tool()
+    def delete_ticket(
+        ticket_id: str,
+        api_key: Optional[str] = None,
+        ctx: Optional[Context] = None,
+    ) -> None:
+        """Delete a Mello ticket."""
+        get_client(api_key=api_key, ctx=ctx).delete_ticket(ticket_id)
+        return None
 
     @server.tool()
     def attach_label_to_ticket(
@@ -968,7 +1063,10 @@ def main() -> None:
         import uvicorn
         import anyio
 
-        starlette_app = server.sse_app()
+        sse_kwargs: Dict[str, Any] = {}
+        if "host" in inspect.signature(server.sse_app).parameters:
+            sse_kwargs["host"] = args.host
+        starlette_app = server.sse_app(**sse_kwargs)
         starlette_app.add_middleware(MelloSseAuthMiddleware)
         config = uvicorn.Config(
             starlette_app,
@@ -979,12 +1077,31 @@ def main() -> None:
         uvicorn_server = uvicorn.Server(config)
         anyio.run(uvicorn_server.serve)
     elif args.transport == "streamable-http":
-        server.settings.host = args.host
-        server.settings.port = args.port
-        server.run(transport="streamable-http")
+        if hasattr(server, "streamable_http_app"):
+            import uvicorn
+            import anyio
+
+            http_kwargs: Dict[str, Any] = {}
+            if "host" in inspect.signature(server.streamable_http_app).parameters:
+                http_kwargs["host"] = args.host
+            starlette_app = server.streamable_http_app(**http_kwargs)
+            starlette_app.add_middleware(MelloSseAuthMiddleware)
+            config = uvicorn.Config(
+                starlette_app,
+                host=args.host,
+                port=args.port,
+                log_level=args.log_level.lower(),
+            )
+            uvicorn_server = uvicorn.Server(config)
+            anyio.run(uvicorn_server.serve)
+        else:
+            server.settings.host = args.host
+            server.settings.port = args.port
+            server.run(transport="streamable-http")
     else:
         server.run(transport="stdio")
 
 
 if __name__ == "__main__":
     main()
+
